@@ -1,3 +1,4 @@
 _extracted/
 _build/
+_cmp/
 *.orig
