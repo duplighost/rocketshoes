@@ -1410,16 +1410,22 @@ function seedExteriorCity(room, rng) {
       const ddy = cy < 0 ? -cy : cy > room.h ? cy - room.h : 0;
       const dout = Math.hypot(ddx, ddy);            // distance outside the arena
       const far = clamp(dout / 3400, 0, 1);
-      const w = STEP * rand(rng, 0.52, 0.9), d = STEP * rand(rng, 0.52, 0.9);
+      const w = STEP * rand(rng, 0.44, 0.86), d = STEP * rand(rng, 0.44, 0.86);
       const x = gx + rand(rng, 8, STEP - w - 8), y = gy + rand(rng, 8, STEP - d - 8);
-      const h = clamp(150 + dout * 0.30 + rand(rng, -60, 220) + far * 260, 90, 1150);
-      const fade = clamp(0.92 - far * 0.5, 0.34, 0.92);  // hazier with distance
+      // Much taller skyline: real skyscrapers, rising further out. (Was 90-1150.)
+      const h = clamp(250 + dout * 0.44 + rand(rng, -40, 380) + far * 480, 150, 2000);
+      const fade = clamp(0.94 - far * 0.5, 0.34, 0.94);  // hazier with distance
       // precomputed faces: roof brightest (biome accent), sides progressively darker
       const roof = mixHexA(mixHexA(pal.floor, pal.accent, 0.22), pal.bg, 0.20 + far * 0.4);
       const faceF = mixHexA(pal.bg, '#05060c', 0.30 + far * 0.4);
       const faceR = mixHexA(pal.bg, '#02030a', 0.52 + far * 0.35);
-      const lit = dout < 2700 && chance(rng, 0.62);
-      list.push({ x, y, w, d, h, roof, faceF, faceR, fade, lit, winCol: winWarm, winSeed: rng() });
+      const lit = dout < 3000 && chance(rng, 0.74);
+      // rooftop dressing for the taller towers — read as a real metropolis
+      const crown = lit && h > 720 && chance(rng, 0.5);     // neon crown band
+      const antenna = h > 980 && chance(rng, 0.55);          // mast + blinking light
+      const setback = h > 620 && chance(rng, 0.5);           // stepped skyscraper top
+      const crownCol = chance(rng, 0.5) ? pal.accent : pal.accent3;
+      list.push({ x, y, w, d, h, roof, faceF, faceR, fade, lit, crown, antenna, setback, crownCol, winCol: winWarm, winSeed: (rng() * 233280) | 0 });
     }
   }
   // far → near so closer towers overlap the ones behind them

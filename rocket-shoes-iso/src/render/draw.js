@@ -1127,39 +1127,99 @@ function drawSkyBackdrop(pal) {
 // roof) with optional emissive window bands. Screen-space polygons via worldToScreen,
 // viewport-culled, drawn far→near (the list is pre-sorted at gen time). Pure backdrop —
 // no collision, no gameplay. This is the big "not just black anymore" win.
+function bilerp(tl, tr, bl, br, fx, fy) {
+  return lerp2(lerp2(tl, tr, fx), lerp2(bl, br, fx), fy);
+}
+
+// Window facade on a face quad (tl,tr,br,bl in screen space): cheap floor/column grid lines
+// + a few stable bright lit windows. Drawn under 'lighter' so it glows.
+function cityFacade(tl, tr, br, bl, cols, rows, gridCol, gridA, winCol, winA, seed) {
+  ctx.strokeStyle = gridCol; ctx.globalAlpha = gridA; ctx.lineWidth = 1;
+  for (let c = 1; c < cols; c++) { const f = c / cols; const a = lerp2(tl, tr, f), b = lerp2(bl, br, f); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  for (let r = 1; r < rows; r++) { const f = r / rows; const a = lerp2(tl, bl, f), b = lerp2(tr, br, f); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  ctx.fillStyle = winCol; ctx.globalAlpha = winA;
+  let s = ((seed % 233280) + 233280) % 233280;
+  const litN = Math.min(7, Math.floor(cols * rows * 0.22));
+  for (let i = 0; i < litN; i++) {
+    s = (s * 9301 + 49297) % 233280; const cc = Math.floor((s / 233280) * cols);
+    s = (s * 9301 + 49297) % 233280; const rr = Math.floor((s / 233280) * rows);
+    const fx0 = (cc + 0.22) / cols, fx1 = (cc + 0.78) / cols, fy0 = (rr + 0.22) / rows, fy1 = (rr + 0.78) / rows;
+    poly([bilerp(tl, tr, bl, br, fx0, fy0), bilerp(tl, tr, bl, br, fx1, fy0), bilerp(tl, tr, bl, br, fx1, fy1), bilerp(tl, tr, bl, br, fx0, fy1)]); ctx.fill();
+  }
+}
+
 function drawExteriorCity(room, pal) {
   const sky = room.skyline;
   if (!sky || !sky.length) return;
+  const tNow = room.time || performance.now() / 1000;
   uiTransform(ctx);
-  ctx.lineJoin = 'round';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
   const ov = visibleRect(700);
   // sky is pre-sorted far→near for the default view; reverse it when the view is flipped
   const n = sky.length;
   for (let k = 0; k < n; k++) {
     const b = cam.flip > 0 ? sky[k] : sky[n - 1 - k];
-    if (b.x + b.w < ov.l - 700 || b.x > ov.r + 700 || b.y + b.d < ov.t - 1500 || b.y > ov.b + 700) continue;
+    if (b.x + b.w < ov.l - 700 || b.x > ov.r + 700 || b.y + b.d < ov.t - 2000 || b.y > ov.b + 700) continue;
     const z = b.h;
     const t0 = worldToScreen(b.x, b.y, z), t1 = worldToScreen(b.x + b.w, b.y, z);
     const t2 = worldToScreen(b.x + b.w, b.y + b.d, z), t3 = worldToScreen(b.x, b.y + b.d, z);
-    const s2 = worldToScreen(b.x + b.w, b.y + b.d, 0), s3 = worldToScreen(b.x, b.y + b.d, 0);
-    const s1 = worldToScreen(b.x + b.w, b.y, 0);
+    const s1 = worldToScreen(b.x + b.w, b.y, 0), s2 = worldToScreen(b.x + b.w, b.y + b.d, 0), s3 = worldToScreen(b.x, b.y + b.d, 0);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = b.fade;
     ctx.fillStyle = b.faceR; poly([t1, t2, s2, s1]); ctx.fill();   // right face
-    ctx.fillStyle = b.faceF; poly([t2, t3, s3, s2]); ctx.fill();   // front face (faces camera)
+    ctx.fillStyle = b.faceF; poly([t3, t2, s2, s3]); ctx.fill();   // front face (faces camera)
     ctx.fillStyle = b.roof;  poly([t0, t1, t2, t3]); ctx.fill();   // roof
-    // emissive window bands on the lit front face (cheap: a few horizontal strokes)
-    if (b.lit) {
+
+    // crisp vertical corner edges — sell the height
+    ctx.strokeStyle = mixHex(b.roof, '#ffffff', 0.10); ctx.globalAlpha = b.fade * 0.5; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(t2.x, t2.y); ctx.lineTo(s2.x, s2.y);
+    ctx.moveTo(t3.x, t3.y); ctx.lineTo(s3.x, s3.y); ctx.moveTo(t1.x, t1.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
+
+    // LOD: only nearer/larger towers get full window detail (keeps the frame cheap)
+    const screenH = Math.abs(s3.y - t3.y);
+    const detail = b.fade > 0.42 && screenH > 30;
+    if (detail) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = b.winCol; ctx.lineWidth = 1.6; ctx.globalAlpha = b.fade * 0.5;
-      const rows = 2 + ((b.winSeed * 4) | 0);
-      for (let i = 1; i <= rows; i++) {
-        const f = i / (rows + 1);
-        const a = lerp2(t3, s3, f), c = lerp2(t2, s2, f);
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
-      }
-      ctx.globalCompositeOperation = 'source-over';
+      const cols = clamp(Math.round(b.w / 64), 2, 6), rows = clamp(Math.round(b.h / 96), 3, 13);
+      cityFacade(t3, t2, s2, s3, cols, rows, b.winCol, b.fade * 0.15, b.winCol, b.fade * 0.6, b.winSeed);          // front
+      cityFacade(t1, t2, s2, s1, Math.max(2, cols - 1), rows, b.winCol, b.fade * 0.10, b.winCol, b.fade * 0.32, b.winSeed * 7 + 13); // right (dimmer)
+    }
+
+    // roof rim
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = mixHex(b.roof, pal.accent, 0.5); ctx.globalAlpha = b.fade * 0.5; ctx.lineWidth = 1.4;
+    poly([t0, t1, t2, t3]); ctx.stroke();
+
+    // stepped setback box on top (skyscraper silhouette)
+    if (b.setback && detail) {
+      const ix = b.w * 0.26, iy = b.d * 0.26, sh = b.h * 0.30;
+      const bx = b.x + ix, by = b.y + iy, bw = b.w - ix * 2, bd = b.d - iy * 2, bz = z + sh;
+      const u0 = worldToScreen(bx, by, bz), u1 = worldToScreen(bx + bw, by, bz), u2 = worldToScreen(bx + bw, by + bd, bz), u3 = worldToScreen(bx, by + bd, bz);
+      const v1 = worldToScreen(bx + bw, by, z), v2 = worldToScreen(bx + bw, by + bd, z), v3 = worldToScreen(bx, by + bd, z);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = b.fade;
+      ctx.fillStyle = b.faceR; poly([u1, u2, v2, v1]); ctx.fill();
+      ctx.fillStyle = b.faceF; poly([u3, u2, v2, v3]); ctx.fill();
+      ctx.fillStyle = b.roof;  poly([u0, u1, u2, u3]); ctx.fill();
+    }
+
+    // neon crown band + antenna beacon on the tallest towers
+    if (b.crown && b.fade > 0.45) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = b.crownCol; ctx.globalAlpha = b.fade * 0.7; ctx.lineWidth = 2;
+      poly([t0, t1, t2, t3]); ctx.stroke();
+    }
+    if (b.antenna && b.fade > 0.5) {
+      const top = worldToScreen(b.x + b.w / 2, b.y + b.d / 2, z + (b.setback ? b.h * 0.30 : 0));
+      const tip = { x: top.x, y: top.y - (30 + (b.winSeed % 30)) * view.scale };
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = mixHex(b.crownCol || pal.accent, '#ffffff', 0.3); ctx.globalAlpha = b.fade * 0.55; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+      const blink = 0.5 + 0.5 * Math.sin(tNow * 4 + b.winSeed);
+      ctx.fillStyle = '#ff5e6c'; ctx.globalAlpha = b.fade * (0.4 + 0.5 * blink);
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, 2.2, 0, TAU); ctx.fill();
     }
   }
+  ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
 }
 
