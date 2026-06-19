@@ -64,9 +64,11 @@ export function rollRoom(run, round) {
   const portrait = view.mobile && view.portrait;
   // Giant sprawl on desktop; phones pull the landscape size back (portrait stays modest).
   // Safe to go big: floor/lanes are viewport-culled and the enemy budget is already capped.
-  // Mobile arenas are much smaller so the whole stage — city, platforms, pad — fits the
-  // view instead of being a vast samey floor you only see a corner of. Desktop stays big.
-  const deviceScale = view.mobile ? (portrait ? 0.62 : 0.52) : 1;
+  // Same arena on every device — mobile is NOT shrunk. (Portrait still uses the portrait
+  // base dims above so a tall screen gets a tall stage, but the scale is 1:1 with desktop.)
+  // Visibility on phones is handled by the camera zoom + taller platforms + pad pointer,
+  // not by making the stage smaller.
+  const deviceScale = 1;
   const room = {
     round, idx: depthIdx(round), stage: dangerStage(round, run.overdrive),
     biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
