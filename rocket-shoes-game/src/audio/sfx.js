@@ -45,6 +45,7 @@ export function sfx(kind) {
   switch (kind) {
     case 'shot': note(520, 0.035, 'triangle', 0.025); break;
     case 'dash': noise(0.035, 0.055); note(250, 0.04, 'triangle', 0.05); break;
+    case 'slice': noise(0.045, 0.065); note(760, 0.045, 'triangle', 0.045); note(1180, 0.055, 'sine', 0.028, 0.025); break;
     case 'kill': note(600, 0.045, 'sine', 0.05); note(900, 0.06, 'sine', 0.035, 0.03); break;
     case 'hurt': noise(0.09, 0.08); note(95, 0.13, 'sawtooth', 0.045); break;
     case 'pulse': noise(0.12, 0.08); note(110, 0.2, 'triangle', 0.07); note(880, 0.18, 'sine', 0.04, 0.05); break;

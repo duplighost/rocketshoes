@@ -126,10 +126,12 @@ export function rollRoom(run, round) {
   // cover scales ~linearly with area so density holds across the much bigger floor
   // (kept moderate — the sprawl reads full from ambient/decals/enemies, not a cover maze).
   const areaBonus = Math.max(2, Math.round((roomAreaScale(room) - 1) * 6));
-  // cap scales with area so cover density holds across the much bigger sprawl
-  const coverCap = Math.round((partitioned ? 22 : 30) * clamp(roomAreaScale(room) / 5.8, 1, 1.75));
-  const count = clamp(7 + density + Math.floor(areaBonus * 0.78) + Math.floor(room.stage * 0.5) + randi(rng, 0, 2)
-    - (partitioned ? 2 : 0) - (landmark ? 2 : 0), partitioned ? 4 : 7, coverCap);
+  // cap scales with area so cover density holds across the much bigger sprawl.
+  // Measured trim for legibility: ~20% less cover than the website build (still WAY
+  // denser than a clean-slate map), so the playfield reads without going to cubicle hell.
+  const coverCap = Math.round((partitioned ? 18 : 24) * clamp(roomAreaScale(room) / 5.6, 1, 1.5));
+  const count = clamp(6 + density + Math.floor(areaBonus * 0.62) + Math.floor(room.stage * 0.4) + randi(rng, 0, 1)
+    - (partitioned ? 2 : 0) - (landmark ? 2 : 0), partitioned ? 4 : 6, coverCap);
   const spots = LAYOUTS[layoutId](room, rng, count);
   for (const s of spots) {
     if (dist(s.x, s.y, px, py) < ROOM.SPAWN_CLEAR) continue;
@@ -159,7 +161,8 @@ export function rollRoom(run, round) {
   // These are validated for portal reachability, so they add traversal decisions without softlocks.
   addRoomStructures(room, rng, px, py, portalX, portalY, partitioned, !!landmark);
   const forceRubble = !bossId && !partitioned && !landmark;
-  if (!bossId && (forceRubble || chance(rng, partitioned ? 0.36 : 0.48))) rubbleField(room, rng, px, py, portalX, portalY);
+  // less scattered rubble (it was a big chunk of the visual confetti / micro-collision)
+  if (!bossId && (forceRubble || chance(rng, partitioned ? 0.24 : 0.34))) rubbleField(room, rng, px, py, portalX, portalY);
 
   // ── elevation: more second-layer rooms, plus vent launchers to make climbing
   // feel like movement tech instead of just walking at a ramp.
@@ -542,13 +545,16 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // readable rooftop lattice, then fills any gaps with extra roof districts. The
   // platforms are organized by the visual district grid, so the map feels built
   // instead of scattered.
-  const wantsTier = chance(rng, partitioned ? 0.94 : 1.0);
+  const wantsTier = chance(rng, partitioned ? 0.85 : 0.92);
   if (!wantsTier) return 0;
-  const cap = room.bossId ? (view.mobile ? 5 : 8) : view.mobile ? (partitioned ? 6 : 8) : (partitioned ? 13 : 18);
+  // Fewer rooftop platforms than the website build: the second layer was a major source
+  // of overlapping silhouettes. Still a real lattice (rails + high-ground routes), just
+  // legible instead of a stacked thicket.
+  const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? (partitioned ? 5 : 6) : (partitioned ? 9 : 12);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
   const target = room.bossId
-    ? clamp(view.mobile ? 3 : 5, 3, cap)
-    : clamp((partitioned ? 4 : 7) + (room.idx >= 3 ? 1 : 0) + (room.idx >= 6 && !view.mobile ? 1 : 0), view.mobile ? 4 : 6, cap);
+    ? clamp(view.mobile ? 3 : 4, 3, cap)
+    : clamp((partitioned ? 3 : 5) + (room.idx >= 4 ? 1 : 0) + (room.idx >= 7 && !view.mobile ? 1 : 0), view.mobile ? 3 : 4, cap);
   for (let tries = 0; room.tiers.length < target && tries < cap * 4; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
@@ -704,9 +710,9 @@ function rectOverlap(a, b, margin = 0) {
 
 
 function ensureMinimumVerticality(room, rng, px, py, portalX, portalY) {
-  const minRoofs = room.bossId ? (view.mobile ? 3 : 5) : (view.mobile ? 4 : 6);
+  const minRoofs = room.bossId ? (view.mobile ? 2 : 4) : (view.mobile ? 3 : 4);
   if ((room.tiers || []).length >= minRoofs) return;
-  const cap = room.bossId ? (view.mobile ? 5 : 8) : view.mobile ? 8 : 16;
+  const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? 6 : 11;
   const before = room.tiers.length;
   seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, cap);
   pruneUnreachableTiers(room, px, py);
@@ -1161,29 +1167,45 @@ function rollSpecies(rng, biome, idx, idolBump = false) {
 }
 
 function buildAnnex(room, rng) {
-  const side = pick(rng, ['n', 'e', 'w']); // not south: player spawns low
-  const w = room.wall;
-  const span = rand(rng, 250, 340), depth = rand(rng, 155, 225);
-  let rect, doorRect, cx, cy;
-  if (side === 'n') {
-    const x = rand(rng, w + 160, room.w - w - 160 - span);
-    rect = { x, y: w, w: span, h: depth };
-    doorRect = { x: x + span * 0.3, y: w + depth - 16, w: span * 0.4, h: 18 };
-    cx = x + span / 2; cy = w + depth * 0.45;
-  } else if (side === 'e') {
-    const y = rand(rng, w + 140, room.h - w - 140 - span);
-    rect = { x: room.w - w - depth, y, w: depth, h: span };
-    doorRect = { x: room.w - w - depth - 2, y: y + span * 0.3, w: 18, h: span * 0.4 };
-    cx = room.w - w - depth * 0.45; cy = y + span / 2;
-  } else {
-    const y = rand(rng, w + 140, room.h - w - 140 - span);
-    rect = { x: w, y, w: depth, h: span };
-    doorRect = { x: w + depth - 16, y: y + span * 0.3, w: 18, h: span * 0.4 };
-    cx = w + depth * 0.45; cy = y + span / 2;
+  // Interior sealed vault. The old version hung the secret room off the OUTER wall, where
+  // it intersected the perimeter edge-rail — so "grinding around the stage" could snag you
+  // behind the secret door. Pulling the whole vault into the interior (well clear of the
+  // wall loop) removes that interaction at the source. Paired with the smooth-slide
+  // collision in player.js, the vault can never become a sticky dash coffin either.
+  const span = rand(rng, 300, 390), depth = rand(rng, 190, 260);
+  const side = pick(rng, ['n', 'e', 'w']); // which side carries the breakable door
+  const wallPad = room.wall + 360;         // hard inset from every wall → off the edge-rail
+  let rect = null, doorRect = null, cx = 0, cy = 0;
+  const t = 18;
+  const make = (x, y) => {
+    const r = { x, y, w: side === 'n' ? span : depth, h: side === 'n' ? depth : span };
+    if (side === 'n') doorRect = { x: r.x + r.w * 0.30, y: r.y + r.h - 16, w: r.w * 0.40, h: 18 };
+    else if (side === 'e') doorRect = { x: r.x - 2, y: r.y + r.h * 0.30, w: 18, h: r.h * 0.40 };
+    else doorRect = { x: r.x + r.w - 16, y: r.y + r.h * 0.30, w: 18, h: r.h * 0.40 };
+    cx = r.x + r.w / 2; cy = r.y + r.h / 2;
+    return r;
+  };
+  const outsideDoor = (r) => {
+    if (side === 'n') return { x: r.x + r.w / 2, y: r.y + r.h + 80 };
+    if (side === 'e') return { x: r.x - 80, y: r.y + r.h / 2 };
+    return { x: r.x + r.w + 80, y: r.y + r.h / 2 };
+  };
+  for (let tries = 0; tries < 70; tries++) {
+    const x = rand(rng, wallPad, room.w - wallPad - (side === 'n' ? span : depth));
+    const y = rand(rng, room.wall + 260, room.h - room.wall - 360 - (side === 'n' ? depth : span));
+    const r = make(x, y);
+    const out = outsideDoor(r);
+    if (dist(cx, cy, room.w / 2, room.h * 0.66) < ROOM.SPAWN_CLEAR + 260) continue;
+    if (room.tiers?.some(tier => rectOverlap(r, tier, 120))) continue;
+    const shellBox = { type: 'rect', x: r.x - t, y: r.y - t, w: r.w + t * 2, h: r.h + t * 2 };
+    if (nearProtectedFlowLane(room, shellBox, -70, 'annex')) continue;
+    if (!fits(room, shellBox, 28)) continue;
+    const reach = reachableFrom(room, room.w / 2, room.h * 0.66);
+    if (!reach.has(out.x, out.y)) continue;   // the door must be approachable from spawn
+    rect = r;
+    break;
   }
-  // Keep the sealed vault off the rooftop blocks so the door stays clearly approachable
-  // from the street and the layout reads tidy.
-  if (room.tiers?.some(t => rectOverlap(rect, t, 40))) return false;
+  if (!rect) return false;
   const ambush = chance(rng, ANNEX.AMBUSH);
   room.annex = {
     side, rect, doorRect, opened: false, cx, cy,
@@ -1192,34 +1214,38 @@ function buildAnnex(room, rng) {
     ambushCount: randi(rng, 2, 3),
     reward: pick(rng, ['heart', 'repair', 'marrow']),
   };
-  // flank walls (solid) + the breakable door
-  const t = 18;
+  const wall = (x, y, w, h) => ({ type: 'rect', x, y, w, h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity, archKind: 'interiorAnnex' });
   if (side === 'n') {
     room.obstacles.push(
-      { type: 'rect', x: rect.x - t, y: rect.y, w: t, h: rect.h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x + rect.w, y: rect.y, w: t, h: rect.h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x, y: rect.y + rect.h - 2, w: doorRect.x - rect.x, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: doorRect.x + doorRect.w, y: rect.y + rect.h - 2, w: rect.x + rect.w - doorRect.x - doorRect.w, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
+      wall(rect.x - t, rect.y - t, t, rect.h + t * 2),
+      wall(rect.x + rect.w, rect.y - t, t, rect.h + t * 2),
+      wall(rect.x, rect.y - t, rect.w, t),
+      wall(rect.x, rect.y + rect.h - 2, doorRect.x - rect.x, t),
+      wall(doorRect.x + doorRect.w, rect.y + rect.h - 2, rect.x + rect.w - doorRect.x - doorRect.w, t),
     );
   } else if (side === 'e') {
     room.obstacles.push(
-      { type: 'rect', x: rect.x, y: rect.y - t, w: rect.w, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x, y: rect.y + rect.h, w: rect.w, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x - 2, y: rect.y, w: t, h: doorRect.y - rect.y, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x - 2, y: doorRect.y + doorRect.h, w: t, h: rect.y + rect.h - doorRect.y - doorRect.h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
+      wall(rect.x - t, rect.y - t, rect.w + t * 2, t),
+      wall(rect.x - t, rect.y + rect.h, rect.w + t * 2, t),
+      wall(rect.x + rect.w, rect.y, t, rect.h),
+      wall(rect.x - 2, rect.y, t, doorRect.y - rect.y),
+      wall(rect.x - 2, doorRect.y + doorRect.h, t, rect.y + rect.h - doorRect.y - doorRect.h),
     );
   } else {
     room.obstacles.push(
-      { type: 'rect', x: rect.x, y: rect.y - t, w: rect.w, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x, y: rect.y + rect.h, w: rect.w, h: t, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x + rect.w - t + 2, y: rect.y, w: t, h: doorRect.y - rect.y, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
-      { type: 'rect', x: rect.x + rect.w - t + 2, y: doorRect.y + doorRect.h, w: t, h: rect.y + rect.h - doorRect.y - doorRect.h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity },
+      wall(rect.x - t, rect.y - t, rect.w + t * 2, t),
+      wall(rect.x - t, rect.y + rect.h, rect.w + t * 2, t),
+      wall(rect.x - t, rect.y, t, rect.h),
+      wall(rect.x + rect.w - t + 2, rect.y, t, doorRect.y - rect.y),
+      wall(rect.x + rect.w - t + 2, doorRect.y + doorRect.h, t, rect.y + rect.h - doorRect.y - doorRect.h),
     );
   }
   room.obstacles.push({
     type: 'rect', ...doorRect, style: 'door', wall: true,
     breakable: true, species: 'annexDoor', hp: SPECIES.annexDoor.hp + room.idx,
   });
+  room.landmarks.push({ kind: 'annexVault', x: cx, y: cy });
+  return true;
 }
 
 // ── Neon districts + flow lanes (ported from ChatGPT's "neon districts" build) ──

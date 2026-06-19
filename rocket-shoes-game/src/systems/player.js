@@ -823,6 +823,7 @@ function performDashCut(p, room, range) {
   }
   if (hits) {
     addFlash(0.14); addShake(0.26);
+    sfx('slice'); // crisp blade "shing" when the dash actually connects (throttled by the per-dash hit set)
     // prime the next shot ONCE per dash (not once per enemy cut), so blender-dashing a
     // crowd doesn't turn into a frame-rate fire hose
     if (!p._dashCutPrimed) { p._dashCutPrimed = true; p.fireCd = 0; }
