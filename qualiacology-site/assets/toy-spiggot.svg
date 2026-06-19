@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Spiggot Moonfeel</title>
+  <desc id="desc">A tiny figure running around a glowing cratered moon in violet space.</desc>
+  <defs>
+    <radialGradient id="space" cx="48%" cy="30%" r="80%">
+      <stop offset="0" stop-color="#42305c"/>
+      <stop offset=".55" stop-color="#111427"/>
+      <stop offset="1" stop-color="#05060b"/>
+    </radialGradient>
+    <radialGradient id="moon" cx="42%" cy="34%" r="62%">
+      <stop offset="0" stop-color="#fff8ce"/>
+      <stop offset=".42" stop-color="#b9d6d7"/>
+      <stop offset=".82" stop-color="#536684"/>
+      <stop offset="1" stop-color="#1b213a"/>
+    </radialGradient>
+    <radialGradient id="rim" cx="50%" cy="48%" r="50%">
+      <stop offset=".65" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7ce9ff" stop-opacity=".38"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="720" fill="url(#space)"/>
+  <g fill="#fff" opacity=".8">
+    <circle cx="126" cy="98" r="2"/><circle cx="204" cy="250" r="3"/><circle cx="322" cy="128" r="2"/><circle cx="476" cy="76" r="3"/><circle cx="846" cy="108" r="2"/><circle cx="1056" cy="196" r="3"/><circle cx="1118" cy="424" r="2"/><circle cx="708" cy="178" r="2"/><circle cx="938" cy="520" r="2"/>
+  </g>
+  <circle cx="600" cy="405" r="270" fill="#7ce9ff" opacity=".12" filter="url(#glow)"/>
+  <circle cx="600" cy="405" r="242" fill="url(#moon)"/>
+  <circle cx="600" cy="405" r="242" fill="url(#rim)"/>
+  <g fill="#273049" opacity=".38">
+    <ellipse cx="490" cy="334" rx="54" ry="26" transform="rotate(-18 490 334)"/>
+    <ellipse cx="710" cy="458" rx="76" ry="34" transform="rotate(20 710 458)"/>
+    <ellipse cx="620" cy="266" rx="42" ry="20" transform="rotate(10 620 266)"/>
+    <ellipse cx="508" cy="512" rx="36" ry="20" transform="rotate(28 508 512)"/>
+  </g>
+  <path d="M364 464 C455 574 617 626 772 564" fill="none" stroke="#fff6c6" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+  <g transform="translate(774 334) rotate(28)">
+    <ellipse cx="0" cy="0" rx="22" ry="34" fill="#f4f5ff"/>
+    <circle cx="0" cy="-38" r="21" fill="#f4f5ff"/>
+    <circle cx="7" cy="-42" r="7" fill="#70e7ff" opacity=".9"/>
+    <path d="M-16 18 L-38 54 M14 18 L42 54" stroke="#f4f5ff" stroke-width="12" stroke-linecap="round"/>
+    <path d="M-18 -4 L-54 -22 M18 -4 L54 -22" stroke="#f4f5ff" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="50" cy="-24" r="9" fill="#ffd36b"/>
+  </g>
+  <path d="M782 306 C830 270 904 246 984 238" fill="none" stroke="#ffd36b" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+</svg>

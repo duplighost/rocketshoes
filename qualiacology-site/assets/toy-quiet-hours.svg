@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Quiet Hours</title>
+  <desc id="desc">A warm endless city street at golden hour with glowing windows.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d1c28"/>
+      <stop offset="0.48" stop-color="#a8583d"/>
+      <stop offset="1" stop-color="#f0bd72"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2022"/>
+      <stop offset="1" stop-color="#09080e"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="68%" cy="28%" r="42%">
+      <stop offset="0" stop-color="#ffe7a6" stop-opacity=".95"/>
+      <stop offset=".38" stop-color="#f3a852" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#120912" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="720" fill="url(#sky)"/>
+  <rect width="1200" height="720" fill="url(#sun)"/>
+  <path d="M0 526 C198 488 350 498 560 534 C785 572 960 562 1200 510 L1200 720 L0 720Z" fill="url(#road)"/>
+  <g opacity=".82">
+    <path d="M48 154 L218 92 L398 154 L398 564 L48 564Z" fill="#1b151d"/>
+    <path d="M438 188 L604 130 L768 190 L768 556 L438 556Z" fill="#261822"/>
+    <path d="M814 146 L1012 84 L1168 158 L1168 548 L814 548Z" fill="#211620"/>
+  </g>
+  <g fill="#f8d291" opacity=".95">
+    <rect x="92" y="202" width="58" height="76" rx="6"/>
+    <rect x="190" y="182" width="68" height="88" rx="6" opacity=".72"/>
+    <rect x="300" y="230" width="50" height="96" rx="6" opacity=".86"/>
+    <rect x="492" y="232" width="74" height="86" rx="7" opacity=".82"/>
+    <rect x="626" y="204" width="62" height="82" rx="6"/>
+    <rect x="868" y="206" width="72" height="88" rx="7"/>
+    <rect x="1008" y="178" width="80" height="110" rx="8" opacity=".72"/>
+  </g>
+  <g fill="none" stroke="#f7c675" stroke-width="5" opacity=".34">
+    <path d="M121 202 V278 M92 240 H150"/>
+    <path d="M224 182 V270 M190 226 H258"/>
+    <path d="M529 232 V318 M492 275 H566"/>
+    <path d="M626 246 H688 M657 204 V286"/>
+    <path d="M904 206 V294 M868 250 H940"/>
+    <path d="M1048 178 V288 M1008 232 H1088"/>
+  </g>
+  <g fill="#0d0b12" opacity=".72">
+    <path d="M172 565 C230 500 304 480 382 566Z"/>
+    <path d="M548 560 C604 492 688 488 742 560Z"/>
+    <path d="M840 552 C894 492 962 492 1034 552Z"/>
+  </g>
+  <g stroke="#f4b969" stroke-width="7" stroke-linecap="round" opacity=".22" filter="url(#soft)">
+    <path d="M95 610 C302 552 498 552 704 610"/>
+    <path d="M360 660 C560 604 760 604 958 660"/>
+  </g>
+  <g fill="#f6c98a" opacity=".7">
+    <circle cx="246" cy="410" r="5"/>
+    <circle cx="682" cy="380" r="4"/>
+    <circle cx="1052" cy="372" r="5"/>
+  </g>
+</svg>
