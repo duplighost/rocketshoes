@@ -546,18 +546,19 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // readable rooftop lattice, then fills any gaps with extra roof districts. The
   // platforms are organized by the visual district grid, so the map feels built
   // instead of scattered.
-  const wantsTier = chance(rng, partitioned ? 0.74 : 0.92);
+  // Heights are deliberately RARE for now: in isometric, lots of floating platforms read
+  // ambiguously (hard to tell what you can stand on / reach) and broke targeting. Until we
+  // design proper sky-platforms, most rooms stay flat ground; a minority roll one or two
+  // low perches as optional high ground. The tier/level system is kept intact for later.
+  const wantsTier = chance(rng, partitioned ? 0.16 : 0.26);
   if (!wantsTier) return 0;
-  const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? (partitioned ? 4 : 5) : (partitioned ? 7 : 9);
+  const cap = room.bossId ? 2 : (view.mobile ? 2 : 3);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
-  const target = room.bossId
-    ? clamp(view.mobile ? 3 : 4, 3, cap)
-    : clamp((partitioned ? 3 : 5) + (room.idx >= 4 ? 1 : 0), view.mobile ? 3 : 4, cap);
+  const target = clamp(1 + (room.idx >= 5 ? 1 : 0), 1, cap);
   for (let tries = 0; room.tiers.length < target && tries < cap * 4; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
-  const minRoofs = room.bossId ? (view.mobile ? 2 : 4) : (view.mobile ? 3 : 4);
-  if (room.tiers.length < minRoofs) made += seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, cap);
+  // No forced minimum: flat rooms are allowed (and common) now.
   return made;
 }
 
@@ -708,6 +709,12 @@ function rectOverlap(a, b, margin = 0) {
 
 
 function ensureMinimumVerticality(room, rng, px, py, portalX, portalY) {
+  // Heights are intentionally rare in the iso build — do NOT force a minimum rooftop count
+  // anymore (that was the main source of "platforms everywhere you can't get on"). Flat
+  // rooms are fine. Whatever tiers seedVerticality rolled stay; we just keep them reachable.
+  pruneUnreachableTiers(room, px, py);
+  return;
+  // eslint-disable-next-line no-unreachable
   const minRoofs = room.bossId ? (view.mobile ? 2 : 4) : (view.mobile ? 3 : 4);
   if ((room.tiers || []).length >= minRoofs) return;
   const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? 5 : 9;

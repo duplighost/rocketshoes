@@ -128,7 +128,7 @@ export function updateBullets(room, dt) {
         const minAlign = relic ? -1 : (PLAYER.SHOT_HOMING_CONE ?? 0.2); // relic homes any direction
         let best = null, bestScore = Infinity;
         for (const e of room.enemies) {
-          if (e.hp <= 0 || (e.level || 0) !== (b.level || 0)) continue;
+          if (e.hp <= 0) continue; // home toward any enemy, any elevation
           const ex = e.x - b.x, ey = e.y - b.y;
           const d = Math.hypot(ex, ey);
           if (d < 1 || d > range) continue;
@@ -156,7 +156,7 @@ export function updateBullets(room, dt) {
 
     if (b.owner === 'player') {
       for (const e of room.enemies) {
-        if (e.hp <= 0 || b.level < e.level) continue; // can't hit higher ground
+        if (e.hp <= 0) continue; // hit enemies at any elevation (no more silent-gun / unclearable rooms)
         if (b.hitIds && b.hitIds.includes(e.id)) continue;
         if (dist(b.x, b.y, e.x, e.y) < b.r + e.r) {
           const k = norm(e.x - b.x, e.y - b.y);

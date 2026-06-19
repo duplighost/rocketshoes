@@ -10,8 +10,10 @@ export const ISO = {
   X: 0.78,
   Y: 0.43,
   TIER_Z: 54,
-  FLOOR_PAD_X: 260,
-  FLOOR_PAD_Y: 270,
+  // Bigger floor padding lets the camera pull back enough to actually SHOW the surrounding
+  // city in the void (it was getting clamped off-screen, especially on phones).
+  FLOOR_PAD_X: 660,
+  FLOOR_PAD_Y: 680,
 };
 
 export const view = {
@@ -39,7 +41,9 @@ export function resize(canvas, bloomCanvas) {
   const small = Math.min(iw, ih);
   // Isometric compression shows more city, so the base camera can sit a touch closer
   // without losing threat readability. Dashing still opens the view dynamically.
-  view.baseScale = view.mobile ? clamp(small / 590, 0.70, 0.98) : 0.78;
+  // Ease the phone zoom out a touch so the surrounding city is visible (it was cropped on
+  // mobile while desktop showed it). Still close enough to read threats.
+  view.baseScale = view.mobile ? clamp(small / 640, 0.62, 0.88) : 0.78;
   view.scale = view.baseScale * view.zoom;
   view.W = Math.max(320, Math.floor(iw));
   view.H = Math.max(320, Math.floor(ih));

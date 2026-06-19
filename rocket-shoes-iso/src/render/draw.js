@@ -281,23 +281,31 @@ function lerp2(a, b, t) {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
+// Grind rails read as GOLD metal tracks — deliberately NOT the biome-accent neon used by
+// the boost roads, so "rail vs road" is obvious at a glance. Twin lines + ties sell it.
+const RAIL_GOLD = '#ffce5a';
 function drawEdgeRail(room, pal, p) {
   if (!room.edgeRail) return;
   const inset = room.wall + 2;
   const t = room.time || performance.now() / 1000;
   const active = !!p?.rail?.active;
+  const col = active ? '#ffffff' : RAIL_GOLD;
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = active ? 0.32 : 0.14;
-  ctx.strokeStyle = active ? '#ffffff' : pal.accent2;
-  ctx.lineWidth = active ? 12 : 7;
+  // soft glow base
+  ctx.globalAlpha = active ? 0.30 : 0.14;
+  ctx.strokeStyle = col; ctx.lineWidth = active ? 12 : 8;
   roundRectPath(ctx, inset, inset, room.w - inset * 2, room.h - inset * 2, 28); ctx.stroke();
-  ctx.globalAlpha = active ? 0.85 : 0.38;
-  ctx.lineWidth = active ? 3.8 : 2.2;
-  ctx.setLineDash([28, 22]);
-  ctx.lineDashOffset = -t * (active ? 360 : 130) - (room.edgeRail.phase || 0) * 40;
+  // twin solid rails (outer + inner) — the "track"
+  ctx.globalAlpha = active ? 0.9 : 0.5; ctx.lineWidth = active ? 3.2 : 2.2;
   roundRectPath(ctx, inset, inset, room.w - inset * 2, room.h - inset * 2, 28); ctx.stroke();
+  roundRectPath(ctx, inset + 7, inset + 7, room.w - (inset + 7) * 2, room.h - (inset + 7) * 2, 22); ctx.stroke();
+  // cross-ties: short dashes that scroll, reading unmistakably as rail (not a smooth road)
+  ctx.globalAlpha = active ? 0.8 : 0.42; ctx.lineWidth = active ? 5 : 3.4;
+  ctx.setLineDash([6, 26]);
+  ctx.lineDashOffset = -t * (active ? 360 : 120) - (room.edgeRail.phase || 0) * 40;
+  roundRectPath(ctx, inset + 3.5, inset + 3.5, room.w - (inset + 3.5) * 2, room.h - (inset + 3.5) * 2, 25); ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -313,8 +321,9 @@ function drawSkyRails(room, pal, p) {
   ctx.globalCompositeOperation = 'lighter';
   for (const r of rails) {
     const active = activeRail === r;
-    const col = r.color || pal.accent2;
-    ctx.globalAlpha = active ? 0.42 : 0.18;
+    // Gold = grindable rail (trunk lines brightest), never the accent-neon of the roads.
+    const col = r.trunk ? RAIL_GOLD : '#ffdca6';
+    ctx.globalAlpha = active ? 0.42 : 0.20;
     ctx.strokeStyle = active ? '#ffffff' : col;
     ctx.lineWidth = active ? (r.trunk ? 19 : 16) : (r.trunk ? 13 : 10);
     ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();

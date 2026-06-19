@@ -174,7 +174,13 @@ function schedule() {
   const s = intensity;
   lpf.frequency.setTargetAtTime(2600 + s * 3200, ac.currentTime, 0.2); // brighten when hot
 
-  while (nextTime < ac.currentTime + LOOKAHEAD) {
+  // Freeze guards: a bad tempo (STEP≈0) or a large scheduling backlog (after the tab was
+  // backgrounded and the AudioContext clock jumped) must never spin this loop forever.
+  if (!(STEP > 0.001)) STEP = 60 / 100 / 4;
+  if (nextTime < ac.currentTime) nextTime = ac.currentTime + 0.02;
+  let guard = 512;
+  while (nextTime < ac.currentTime + LOOKAHEAD && guard-- > 0) {
+    if (!(STEP > 0.001)) STEP = 60 / 100 / 4; // re-guard if a bar boundary re-keyed it badly
     const t = nextTime, i = step % 16, bar = Math.floor(step / 16), phrase = Math.floor(bar / 4);
 
     // re-key the song at bar boundaries when the room/mode changed (no mid-bar jumps)

@@ -777,9 +777,11 @@ function updateSkyRailRide(p, room, move, dt) {
 // nearest live enemy on the player's level — the auto-aim target when not aiming manually.
 function nearestEnemy(room, p) {
   let best = null, bd = Infinity;
-  const lv = p.level || 0;
+  // Target any enemy regardless of elevation. Tying auto-aim to the player's level meant
+  // stepping onto a raised tile silenced the gun (no same-level target) — and if the last
+  // enemies sat on higher ground the room could never clear. The gun now never goes quiet.
   for (const e of room.enemies) {
-    if (e.hp <= 0 || (e.level || 0) !== lv) continue;
+    if (e.hp <= 0) continue;
     const dx = e.x - p.x, dy = e.y - p.y, d = dx * dx + dy * dy;
     if (d < bd) { bd = d; best = e; }
   }
