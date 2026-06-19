@@ -9,8 +9,8 @@ import { FX } from '../config.js';
 export const ISO = {
   X: 0.78,
   Y: 0.43,
-  TIER_Z: 72,   // taller platforms → a genuine "sky" layer (was 54, a low mesa). Drives
-                // both the camera lift and the render lift (draw.js TIER_LIFT = ISO.TIER_Z).
+  TIER_Z: 130,  // WAY taller platforms — dramatic sky towers you can read at a glance
+                // (was 72). Drives camera + render lift (draw.js TIER_LIFT = ISO.TIER_Z).
   // Bigger floor padding lets the camera pull back enough to actually SHOW the surrounding
   // city in the void (it was getting clamped off-screen, especially on phones).
   FLOOR_PAD_X: 660,
@@ -42,9 +42,10 @@ export function resize(canvas, bloomCanvas) {
   const small = Math.min(iw, ih);
   // Isometric compression shows more city, so the base camera can sit a touch closer
   // without losing threat readability. Dashing still opens the view dynamically.
-  // Ease the phone zoom out a touch so the surrounding city is visible (it was cropped on
-  // mobile while desktop showed it). Still close enough to read threats.
-  view.baseScale = view.mobile ? clamp(small / 640, 0.62, 0.88) : 0.78;
+  // Phones zoom out a lot more now: combined with the smaller mobile arenas (roomRoller),
+  // you can actually SEE the whole stage — the surrounding city, the platforms, the flip
+  // pad — instead of a samey patch of floor. Sprites stay legible at this distance.
+  view.baseScale = view.mobile ? clamp(small / 760, 0.5, 0.72) : 0.78;
   view.scale = view.baseScale * view.zoom;
   view.W = Math.max(320, Math.floor(iw));
   view.H = Math.max(320, Math.floor(ih));

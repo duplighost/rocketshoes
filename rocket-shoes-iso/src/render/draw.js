@@ -165,6 +165,7 @@ export function drawFrame() {
   drawEclipse(room); // False Moon's eclipse darkens the field around the moon
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);
+  if (room.flipPad && state.mode === 'play') drawFlipPadPointer(room);
   if (room.portal) drawPortalArrow(room);
   drawBossBar(room);
   drawBossIntro(room);
@@ -1097,17 +1098,49 @@ function drawFlipPad(room, pal) {
   ctx.beginPath(); ctx.ellipse(c.x, c.y, rx, ry, 0, 0, TAU); ctx.stroke();
   ctx.globalAlpha = 0.4 + 0.3 * pulse; ctx.lineWidth = 1.6; ctx.strokeStyle = '#eaffff';
   ctx.beginPath(); ctx.ellipse(c.x, c.y, rx * 0.62, ry * 0.62, 0, 0, TAU); ctx.stroke();
-  // faint beacon column so it reads from afar on the huge map
-  ctx.globalAlpha = 0.10 + 0.08 * pulse;
-  ctx.fillStyle = pal.accent2;
-  ctx.fillRect(c.x - 2, c.y - 120 * view.scale, 4, 120 * view.scale);
-  // ⟳ glyph, lifted a touch
+  // tall light-beam column so the button reads from clear across the stage
+  const bh = 340 * view.scale;
+  const beam = ctx.createLinearGradient(c.x, c.y - bh, c.x, c.y);
+  beam.addColorStop(0, hexA(pal.accent2, 0));
+  beam.addColorStop(1, hexA(pal.accent2, 0.45 + 0.3 * pulse));
+  ctx.globalAlpha = 1; ctx.fillStyle = beam;
+  ctx.fillRect(c.x - 3.5, c.y - bh, 7, bh);
+  // ⟳ glyph + label, lifted above the pad
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 0.92; ctx.fillStyle = '#eaffff';
-  ctx.font = `900 ${Math.max(15, Math.round(24 * view.scale))}px Inter, system-ui, sans-serif`;
+  ctx.shadowColor = pal.accent2; ctx.shadowBlur = 12;
+  ctx.globalAlpha = 0.95; ctx.fillStyle = '#eaffff';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.shadowColor = pal.accent2; ctx.shadowBlur = 10;
-  ctx.fillText('⟳', c.x, c.y - 18 * view.scale);
+  ctx.font = `900 ${Math.max(20, Math.round(30 * view.scale))}px Inter, system-ui, sans-serif`;
+  ctx.fillText('⟳', c.x, c.y - 22 * view.scale);
+  ctx.globalAlpha = 0.7 + 0.2 * pulse;
+  ctx.font = `800 ${Math.max(10, Math.round(12 * view.scale))}px Inter, system-ui, sans-serif`;
+  ctx.fillText('FLIP', c.x, c.y - 46 * view.scale);
+  ctx.restore();
+}
+
+// Off-screen pointer so the flip button is always findable: when the pad is off-screen,
+// pin a pulsing gold ⟳ arrow to the screen edge aimed at it.
+function drawFlipPadPointer(room) {
+  const pad = room.flipPad;
+  if (!pad) return;
+  const s = worldToScreen(pad.x, pad.y, 0);
+  const m = 36;
+  if (s.x > m && s.x < view.W - m && s.y > m && s.y < view.H - m) return; // visible → the pad draws itself
+  const pal = room.biome.pal;
+  const cx = clamp(s.x, m, view.W - m), cy = clamp(s.y, m, view.H - m);
+  const ang = Math.atan2(s.y - view.H / 2, s.x - view.W / 2);
+  const t = room.time || performance.now() / 1000;
+  const pulse = 0.55 + 0.45 * Math.sin(t * 4);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
+  ctx.globalAlpha = 0.45 + 0.45 * pulse;
+  ctx.fillStyle = pal.accent2; ctx.shadowColor = pal.accent2; ctx.shadowBlur = 9;
+  ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.closePath(); ctx.fill();
+  ctx.rotate(-ang);
+  ctx.fillStyle = '#eaffff'; ctx.globalAlpha = 0.92; ctx.shadowBlur = 6;
+  ctx.font = '900 13px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('⟳', 0, 0);
   ctx.restore();
 }
 

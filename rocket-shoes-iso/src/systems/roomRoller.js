@@ -64,7 +64,9 @@ export function rollRoom(run, round) {
   const portrait = view.mobile && view.portrait;
   // Giant sprawl on desktop; phones pull the landscape size back (portrait stays modest).
   // Safe to go big: floor/lanes are viewport-culled and the enemy budget is already capped.
-  const deviceScale = view.mobile ? (portrait ? 0.98 : 0.72) : 1;
+  // Mobile arenas are much smaller so the whole stage — city, platforms, pad — fits the
+  // view instead of being a vast samey floor you only see a corner of. Desktop stays big.
+  const deviceScale = view.mobile ? (portrait ? 0.62 : 0.52) : 1;
   const room = {
     round, idx: depthIdx(round), stage: dangerStage(round, run.overdrive),
     biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
@@ -550,11 +552,11 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // 2-3 platform upper route. Two+ platforms means seedSkyRails strings a gold grind-rail
   // network between them, seedVents gives a clear launch up, and seedHighGroundRewards puts
   // a cache on top — so going vertical is a readable choice with a payoff.
-  const wantsTier = chance(rng, partitioned ? 0.42 : 0.54);
+  const wantsTier = chance(rng, partitioned ? 0.74 : 0.88); // most rooms now have a sky layer
   if (!wantsTier) return 0;
-  const cap = room.bossId ? 2 : (view.mobile ? 2 : 3);
+  const cap = room.bossId ? 2 : (view.mobile ? 3 : 4);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
-  const target = clamp(2 + (room.idx >= 6 ? 1 : 0), 2, cap); // 2+ so the sky route connects
+  const target = clamp(2 + (room.idx >= 5 ? 1 : 0), 2, cap); // 2+ so the sky route connects
   for (let tries = 0; room.tiers.length < target && tries < cap * 5; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
@@ -1397,23 +1399,29 @@ function seedFlowLanes(room, rng, px, py, portalX, portalY) {
 function seedExteriorCity(room, rng) {
   const pal = room.biome.pal;
   // Sparser + tighter ring on phones to keep the per-frame cull/draw cheap.
-  const MARGIN = view.mobile ? 2200 : 3200, GAP = 150, STEP = view.mobile ? 520 : 420;
+  // GAP small so towers crowd right up to the arena wall — the city is unmissable the
+  // instant you approach any edge (it used to start 150px out and read as empty).
+  const MARGIN = view.mobile ? 2400 : 3200, GAP = 40, STEP = view.mobile ? 360 : 420;
   const list = [];
-  const winWarm = chance(rng, 0.5) ? '#ffd9a8' : mixHexA(pal.accent2, '#ffffff', 0.35);
+  // Per-stage skyline CHARACTER so no two cities feel the same: dense downtown vs sparse
+  // outskirts, low-rise vs spired, and a window-glow theme. Big lever against "samey".
+  const winWarm = pick(rng, ['#ffd9a8', mixHexA(pal.accent2, '#ffffff', 0.35), mixHexA(pal.accent3, '#ffffff', 0.32), '#9fe8ff', '#ff9ad8']);
+  const density = rand(rng, 0.6, 0.92);
+  const tallMul = rand(rng, 0.78, 1.6);
   for (let gx = -MARGIN; gx < room.w + MARGIN; gx += STEP) {
     for (let gy = -MARGIN; gy < room.h + MARGIN; gy += STEP) {
       const cx = gx + STEP / 2, cy = gy + STEP / 2;
       // never build over (or right up against) the playfield
       if (cx > -GAP && cx < room.w + GAP && cy > -GAP && cy < room.h + GAP) continue;
-      if (!chance(rng, 0.76)) continue; // gaps read as streets/canyons
+      if (!chance(rng, density)) continue; // gaps read as streets/canyons (per-stage density)
       const ddx = cx < 0 ? -cx : cx > room.w ? cx - room.w : 0;
       const ddy = cy < 0 ? -cy : cy > room.h ? cy - room.h : 0;
       const dout = Math.hypot(ddx, ddy);            // distance outside the arena
       const far = clamp(dout / 3400, 0, 1);
       const w = STEP * rand(rng, 0.44, 0.86), d = STEP * rand(rng, 0.44, 0.86);
       const x = gx + rand(rng, 8, STEP - w - 8), y = gy + rand(rng, 8, STEP - d - 8);
-      // Much taller skyline: real skyscrapers, rising further out. (Was 90-1150.)
-      const h = clamp(250 + dout * 0.44 + rand(rng, -40, 380) + far * 480, 150, 2000);
+      // Much taller skyline, scaled by this stage's character. (Was 90-1150.)
+      const h = clamp((250 + dout * 0.44 + rand(rng, -40, 380) + far * 480) * tallMul, 150, 2600);
       const fade = clamp(0.94 - far * 0.5, 0.34, 0.94);  // hazier with distance
       // precomputed faces: roof brightest (biome accent), sides progressively darker
       const roof = mixHexA(mixHexA(pal.floor, pal.accent, 0.22), pal.bg, 0.20 + far * 0.4);
