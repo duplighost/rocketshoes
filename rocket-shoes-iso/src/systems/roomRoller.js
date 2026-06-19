@@ -546,19 +546,18 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // readable rooftop lattice, then fills any gaps with extra roof districts. The
   // platforms are organized by the visual district grid, so the map feels built
   // instead of scattered.
-  // Heights are deliberately RARE for now: in isometric, lots of floating platforms read
-  // ambiguously (hard to tell what you can stand on / reach) and broke targeting. Until we
-  // design proper sky-platforms, most rooms stay flat ground; a minority roll one or two
-  // low perches as optional high ground. The tier/level system is kept intact for later.
-  const wantsTier = chance(rng, partitioned ? 0.16 : 0.26);
+  // SKY PLATFORMS (deliberate, not the old random thicket): about half the rooms roll a
+  // 2-3 platform upper route. Two+ platforms means seedSkyRails strings a gold grind-rail
+  // network between them, seedVents gives a clear launch up, and seedHighGroundRewards puts
+  // a cache on top — so going vertical is a readable choice with a payoff.
+  const wantsTier = chance(rng, partitioned ? 0.42 : 0.54);
   if (!wantsTier) return 0;
   const cap = room.bossId ? 2 : (view.mobile ? 2 : 3);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
-  const target = clamp(1 + (room.idx >= 5 ? 1 : 0), 1, cap);
-  for (let tries = 0; room.tiers.length < target && tries < cap * 4; tries++) {
+  const target = clamp(2 + (room.idx >= 6 ? 1 : 0), 2, cap); // 2+ so the sky route connects
+  for (let tries = 0; room.tiers.length < target && tries < cap * 5; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
-  // No forced minimum: flat rooms are allowed (and common) now.
   return made;
 }
 

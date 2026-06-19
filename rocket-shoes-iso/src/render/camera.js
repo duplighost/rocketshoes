@@ -9,7 +9,8 @@ import { FX } from '../config.js';
 export const ISO = {
   X: 0.78,
   Y: 0.43,
-  TIER_Z: 54,
+  TIER_Z: 72,   // taller platforms → a genuine "sky" layer (was 54, a low mesa). Drives
+                // both the camera lift and the render lift (draw.js TIER_LIFT = ISO.TIER_Z).
   // Bigger floor padding lets the camera pull back enough to actually SHOW the surrounding
   // city in the void (it was getting clamped off-screen, especially on phones).
   FLOOR_PAD_X: 660,

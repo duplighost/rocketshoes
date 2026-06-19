@@ -202,10 +202,13 @@ function drawTiers(room, pal) {
     ];
 
     ctx.save();
-    // anchored city-block shadow
-    ctx.globalAlpha = 0.28;
+    // Anchored ground shadow — shows the platform's footprint cast on the floor it floats
+    // above, so the HEIGHT reads at a glance. Two soft passes; offset scales with the lift.
     ctx.fillStyle = '#000000';
-    poly(base.map(p => ({ x: p.x + 10, y: p.y + 18 }))); ctx.fill();
+    ctx.globalAlpha = 0.34;
+    poly(base.map(p => ({ x: p.x + 18, y: p.y + 34 }))); ctx.fill();
+    ctx.globalAlpha = 0.22;
+    poly(base.map(p => ({ x: p.x + 9, y: p.y + 16 }))); ctx.fill();
 
     // visible cliff faces, darkest on the rear-left so height reads immediately.
     const faces = [
