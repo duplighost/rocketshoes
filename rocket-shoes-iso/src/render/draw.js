@@ -322,10 +322,21 @@ function drawSkyRails(room, pal, p) {
   applyIsoZ(ctx, TIER_LIFT); // these are second-layer rails; floor-level dashes ignore them
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'lighter';
+  const activeSky = cam.flip > 0 ? 'A' : 'B';
   for (const r of rails) {
+    const phantom = !!r.flipSet;            // 'B' = the flip-revealed alternate network
+    const revealed = !phantom || r.flipSet === activeSky;
+    if (!revealed) {
+      // faint ghost of the other angle's routing — a tease that there's more sky to find
+      ctx.globalAlpha = 0.13; ctx.strokeStyle = '#ff84e6'; ctx.lineWidth = 2;
+      ctx.setLineDash([10, 16]); ctx.lineDashOffset = -t * 44;
+      ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();
+      ctx.setLineDash([]);
+      continue;
+    }
     const active = activeRail === r;
-    // Gold = grindable rail (trunk lines brightest), never the accent-neon of the roads.
-    const col = r.trunk ? RAIL_GOLD : '#ffdca6';
+    // Gold = base grind network; magenta = the revealed phantom network. Never road-neon.
+    const col = phantom ? '#ff84e6' : (r.trunk ? RAIL_GOLD : '#ffdca6');
     ctx.globalAlpha = active ? 0.42 : 0.20;
     ctx.strokeStyle = active ? '#ffffff' : col;
     ctx.lineWidth = active ? (r.trunk ? 19 : 16) : (r.trunk ? 13 : 10);

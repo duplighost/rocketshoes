@@ -10,7 +10,7 @@ import { spawnBullet } from './bullets.js';
 import { damageEnemy } from './combat.js';
 import { damageObstacle } from './breakables.js';
 import { hooks } from './items.js';
-import { view, toggleViewFlip } from '../render/camera.js';
+import { view, cam, toggleViewFlip } from '../render/camera.js';
 import { levelAt, surfaceAt } from './levels.js';
 
 export function makePlayer() {
@@ -542,8 +542,10 @@ function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {
   if ((p._railLatchCd || 0) > 0) return false;
   const rails = room.skyRails || [];
   if (!rails.length || startLevel < 1 || (p.level || 0) < 1) return false; // floor-level dashes pass underneath
+  const activeSky = cam.flip > 0 ? 'A' : 'B'; // phantom ('B') rails only grind in the flipped view
   let best = null, bestInfo = null, bestD = Infinity;
   for (const r of rails) {
+    if (r.flipSet && r.flipSet !== activeSky) continue;
     if ((r.level || 1) !== (p.level || 0)) continue;
     const d = segmentSegmentDist(x0, y0, p.x, p.y, r.x1, r.y1, r.x2, r.y2);
     const info = pointSegmentInfo(p.x, p.y, r.x1, r.y1, r.x2, r.y2);

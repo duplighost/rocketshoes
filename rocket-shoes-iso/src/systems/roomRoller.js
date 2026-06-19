@@ -840,19 +840,21 @@ function seedSkyRails(room, rng) {
     pairs.push({ a, b, d: dist(ax, ay, bx, by) });
   }
   const used = new Set();
+  const usedB = new Set(); // phantom network dedups independently so it isn't starved of pairs
   const connected = new Set();
   const key = (a, b) => [a.id, b.id].sort((u, v) => u - v).join(':');
-  const add = (pair, trunk = false) => {
+  const add = (pair, trunk = false, flipSet = null) => {
     if (!pair) return false;
     const k = key(pair.a, pair.b);
-    if (used.has(k)) return false;
-    used.add(k);
-    connected.add(pair.a.id); connected.add(pair.b.id);
+    const dedup = flipSet === 'B' ? usedB : used;   // phantom rails may reuse base pairs (different jitter/colour)
+    if (dedup.has(k)) return false;
+    dedup.add(k);
+    if (flipSet !== 'B') { connected.add(pair.a.id); connected.add(pair.b.id); }
     const A = point(pair.a, trunk ? 0.16 : 0.24), B = point(pair.b, trunk ? 0.16 : 0.24);
     room.skyRails.push({
       x1: A.x, y1: A.y, x2: B.x, y2: B.y,
       level: 1, width: trunk ? 58 : 46, boost: trunk ? 1500 : 1320,
-      trunk,
+      trunk, flipSet, // flipSet 'B' rails are the phantom network revealed by the 180° flip
       color: chance(rng, 0.5) ? room.biome.pal.accent2 : room.biome.pal.accent3,
       phase: rng() * TAU,
     });
@@ -882,6 +884,18 @@ function seedSkyRails(room, rng) {
   for (const pair of loopOrder) {
     if (room.skyRails.length >= maxRails) break;
     add(pair, false);
+  }
+
+  // ── PHANTOM network (revealed only when the view is flipped 180°) ──
+  // A second routing across the same platforms, tagged flipSet 'B'. In the default view
+  // these show as faint ghost lines (a tease); flip the camera and they light up solid and
+  // become grindable — a whole different way through the sky, plus the caches up there.
+  const altMax = Math.min(view.mobile ? 3 : 6, pairs.length);
+  const altOrder = [...pairs].sort((a, b) => Math.abs(a.d - 1040) - Math.abs(b.d - 1040)); // favour different (mid) spans
+  let altCount = 0;
+  for (const pair of altOrder) {
+    if (altCount >= altMax) break;
+    if (add(pair, altCount === 0, 'B')) altCount++; // skips pairs the base net already used → genuinely different routes
   }
 }
 
@@ -913,6 +927,17 @@ function seedHighGroundRewards(room, rng) {
     room.obstacles.push(o);
     room.landmarks.push({ kind: 'skyCache', x: o.x, y: o.y });
     room.setpieces.push({ kind: 'liftBeacon', x: o.x + rand(rng, -34, 34), y: o.y - 58, r: 26, level: o.level, color: room.biome.pal.accent2, phase: rng() * TAU });
+  }
+  // Flip-revealed sky caches: a reward sitting ON a platform that only shimmers into
+  // existence (and becomes grabbable) when the view is flipped. Pairs with the phantom
+  // rail network — flip, grind the revealed line to the platform, snag the prize.
+  for (const t of tiers) {
+    if (!chance(rng, 0.5)) continue;
+    const type = pick(rng, ['heart', 'marrow', 'repair']);
+    room.pickups.push({
+      type, x: t.x + t.w * rand(rng, 0.4, 0.6), y: t.y + t.h * rand(rng, 0.4, 0.6),
+      vx: 0, vy: 0, r: 11, life: 1e9, level: t.height || 1, flipHidden: true,
+    });
   }
 }
 
