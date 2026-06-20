@@ -37,6 +37,10 @@ export function boot() {
   bloomCanvas = document.createElement('canvas');
   initDraw(canvas, bloomCanvas);
   resize(canvas, bloomCanvas);
+  // stamp the loaded build onto the on-screen badge — proves which version this device
+  // is actually running (a cached/stale deploy shows an older number, or no badge at all).
+  const verTag = document.getElementById('verTag');
+  if (verTag) verTag.textContent = 'v' + VERSION;
   addEventListener('resize', () => resize(canvas, bloomCanvas), { passive: true });
   loadSprites();
   initOverlays();
