@@ -605,6 +605,34 @@ export function drawEnemy(ctx, e, room) {
     }
     case 'boss': {
       const t = performance.now() / 1000;
+      // enrage / final-stand aura: the boss visibly seethes once it transforms, so its
+      // field presence escalates with the bar. Desperate adds radiating spikes.
+      if (e.enraged || e.desperate) {
+        const ar = e.desperate ? '#ff5d6c' : '#ff9b4a';
+        const ap = 0.5 + Math.sin(t * (e.desperate ? 12 : 7)) * 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const ag = ctx.createRadialGradient(0, 0, e.r * 0.5, 0, 0, e.r * (1.9 + ap * 0.5));
+        ag.addColorStop(0, hexA(ar, 0));
+        ag.addColorStop(0.62, hexA(ar, 0.10 + ap * 0.12));
+        ag.addColorStop(1, hexA(ar, 0));
+        ctx.fillStyle = ag;
+        ctx.beginPath(); ctx.arc(0, 0, e.r * (1.9 + ap * 0.5), 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.5 + ap * 0.4;
+        ctx.strokeStyle = ar; ctx.lineWidth = 2 + ap * 2;
+        ctx.beginPath(); ctx.arc(0, 0, e.r * (1.34 + ap * 0.16), 0, TAU); ctx.stroke();
+        if (e.desperate) {
+          ctx.globalAlpha = 0.6;
+          for (let k = 0; k < 10; k++) {
+            const a = t * 1.6 + (k / 10) * TAU;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * e.r * 1.4, Math.sin(a) * e.r * 1.4);
+            ctx.lineTo(Math.cos(a) * e.r * (1.72 + ap * 0.4), Math.sin(a) * e.r * (1.72 + ap * 0.4));
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
       ctx.shadowBlur = 26;
       ctx.strokeStyle = body; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(0, 0, e.r, 0, TAU); ctx.stroke();
@@ -806,6 +834,30 @@ export function drawObstacle(ctx, o, room) {
       ctx.lineTo(o.x + o.w * 0.36, o.y + o.h * 0.82);
       ctx.stroke();
     }
+    ctx.restore();
+    return;
+  }
+
+  if (o.style === 'cloud') {
+    // dash-only cloud gate: a luminous vapour puff. Reads soft, but blocks until a dash
+    // tears through it.
+    const ccx = o.x, ccy = o.y, ccr = o.rad, tc = performance.now() / 1000;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const a = tc * 0.5 + i * TAU / 4 + (o.phase || 0);
+      const ox = Math.cos(a) * ccr * 0.30, oy = Math.sin(a) * ccr * 0.20;
+      const rr = ccr * (0.66 - i * 0.06);
+      const g = ctx.createRadialGradient(ccx + ox, ccy + oy, 0, ccx + ox, ccy + oy, rr);
+      g.addColorStop(0, hexA('#ffffff', 0.46));
+      g.addColorStop(0.6, hexA('#cfe8ff', 0.26));
+      g.addColorStop(1, hexA('#bdeaff', 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ccx + ox, ccy + oy, rr, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 0.42; ctx.fillStyle = '#eef7ff';
+    ctx.beginPath(); ctx.arc(ccx, ccy, ccr * 0.46, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.restore();
     return;
   }

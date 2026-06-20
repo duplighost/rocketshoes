@@ -1,7 +1,7 @@
 // Shared damage/kill/hurt resolution — the one place hp changes hands.
 import { state } from '../state.js';
 import { PLAYER, TAU } from '../config.js';
-import { norm } from '../rng.js';
+import { norm, clamp } from '../rng.js';
 import { particle, burst, addFloat, ripple } from '../render/particles.js';
 import { addShake, addFlash, hitPause, haptic, slowMo } from './juice.js';
 import { sfx } from '../audio/sfx.js';
@@ -95,8 +95,44 @@ export function killEnemy(e, kind = 'shot', staggered = false) {
     ripple(room, e.x, e.y, room.biome.pal.accent3, 70, 0.32);
     addFloat(room, e.x, e.y - (e.r || 16) - 10, '✕', '#ffffff', false, 0.4);
   }
+  // mowing a room down should CRESCENDO — rapid consecutive kills escalate with
+  // callouts + juice (the dash loop is the whole game; make it sing). Boss death is
+  // its own climax, so it's excluded.
+  if (!e.boss) killChainFlourish(room, run, e);
   if (e.captainDeath) e.captainDeath(e);
   hooks.run('onKill', e);
+}
+
+// Kill-chain crescendo. Consecutive kills inside a short window stack a counter; each
+// new escalation tier slams a word in with growing shake/flash/slow-mo. Announces once
+// per tier (not every kill) so it punches instead of flickering.
+const CHAIN_TIERS = [
+  [12, 'ANNIHILATION', '#ff5d6c'],
+  [9, 'MASSACRE', '#ff7b3c'],
+  [6, 'RAMPAGE', '#ffb13c'],
+  [4, 'OVERKILL', '#ffe24a'],
+  [3, 'TRIPLE', '#9fffe0'],
+  [2, 'DOUBLE KILL', '#bdeaff'],
+];
+function killChainFlourish(room, run, e) {
+  const t = room.time || 0;
+  run._killChain = (t - (run._lastKillAt ?? -99) <= 1.2) ? (run._killChain || 0) + 1 : 1;
+  run._lastKillAt = t;
+  run.bestKillChain = Math.max(run.bestKillChain || 0, run._killChain);
+  const n = run._killChain;
+  if (n < 2) return;
+  const tier = CHAIN_TIERS.find(c => n >= c[0]);
+  if (!tier) return;
+  // fire on the exact tier threshold, then re-announce the top tier every 4 beyond it
+  if (n !== tier[0] && !(n > 12 && n % 4 === 0)) return;
+  const p = run.player;
+  const scale = clamp(0.78 + n * 0.1, 0.85, 1.85);
+  addFloat(room, p.x, p.y - 66, tier[1], tier[2], true, scale);
+  addShake(clamp(0.12 + n * 0.03, 0.12, 0.52));
+  addFlash(clamp(0.05 + n * 0.018, 0.05, 0.3));
+  ripple(room, e.x, e.y, tier[2], 78 + n * 7, 0.34);
+  if (n >= 3) slowMo(clamp(0.045 + n * 0.011, 0.045, 0.16));
+  sfx(n >= 6 ? 'clear' : 'care');
 }
 
 // A boss going down is the climax of the run — earn it: big bullet-time, a staged

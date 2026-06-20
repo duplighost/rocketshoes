@@ -3,7 +3,7 @@
 
 export const TAU = Math.PI * 2;
 export const SAVE_KEY = 'oneRoomNoMoon.v1';
-export const VERSION = '2.0.0-rocket-shoes-topdown';
+export const VERSION = '2.1.0-rocket-shoes-topdown';
 
 export const ROOM = {
   W: 2050, H: 1460, H_PORTRAIT: 1820,   // base dims (the roller rolls actual sizes; these document the target)

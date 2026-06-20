@@ -7,7 +7,7 @@ import { clamp } from '../rng.js';
 import { view, cam, applyWorldTransform, uiTransform } from './camera.js';
 import { drawPlayer, drawEnemy, drawObstacle, drawCare, roundRectPath, starPath, heartPath, bossCards, mix as mixHex } from './sprites.js';
 
-const TIER_LIFT = 34; // px a platform (level 1) rises; entities on it lift to match
+const TIER_LIFT = 60; // px a platform (level 1) rises; entities on it lift to match (taller buildings)
 import { drawParticles, drawFloats } from './particles.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { itemById } from '../data/items.js';
@@ -255,6 +255,19 @@ function drawEdgeRail(room, pal, p) {
   ctx.restore();
 }
 
+// Trace a sky rail's path (straight, or a sine-bowed twist) — matches skyRailPoint() in
+// player.js so the drawn curve is exactly the grind path.
+function traceSkyRail(r) {
+  if (!r.bow) { ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); return; }
+  const dx = r.x2 - r.x1, dy = r.y2 - r.y1, len = Math.hypot(dx, dy) || 1;
+  const cnx = -dy / len, cny = dx / len, k = r.twists || 1, N = 18;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, off = r.bow * Math.sin(u * Math.PI * k);
+    const x = r.x1 + dx * u + cnx * off, y = r.y1 + dy * u + cny * off;
+    if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }
+}
+
 function drawSkyRails(room, pal, p) {
   const rails = room.skyRails || [];
   if (!rails.length) return;
@@ -271,12 +284,12 @@ function drawSkyRails(room, pal, p) {
     ctx.globalAlpha = active ? 0.42 : 0.2;
     ctx.strokeStyle = active ? '#ffffff' : col;
     ctx.lineWidth = active ? (r.trunk ? 19 : 16) : (r.trunk ? 13 : 10);
-    ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();
+    ctx.beginPath(); traceSkyRail(r); ctx.stroke();
     ctx.globalAlpha = active ? 0.92 : 0.46;
     ctx.lineWidth = active ? (r.trunk ? 5.2 : 4.2) : (r.trunk ? 3.0 : 2.4);
     ctx.setLineDash([24, 18]);
     ctx.lineDashOffset = -t * (active ? 420 : 160) - (r.phase || 0) * 30;
-    ctx.beginPath(); ctx.moveTo(r.x1, r.y1); ctx.lineTo(r.x2, r.y2); ctx.stroke();
+    ctx.beginPath(); traceSkyRail(r); ctx.stroke();
     ctx.setLineDash([]);
     // end caps: readable latch points without floor text
     ctx.globalAlpha = active ? 0.90 : 0.40;
@@ -486,6 +499,21 @@ function drawSetpieces(room, pal) {
     ctx.globalAlpha = 0.70;
     ctx.strokeStyle = col; ctx.fillStyle = hexA(col, 0.16); ctx.lineWidth = 2.2;
     const pulse = 1 + Math.sin(t * 2 + s.phase) * 0.08;
+    if (s.kind === 'cloudBank') {
+      // soft, non-colliding vapour framing the cloud dash-run
+      const drift = Math.sin(t * 0.8 + s.phase) * 3;
+      for (let i = 0; i < 3; i++) {
+        const ox = (i - 1) * s.r * 0.5, oy = drift + Math.cos(t * 0.6 + i + s.phase) * 2;
+        const rr = s.r * (0.9 - i * 0.12);
+        const g = ctx.createRadialGradient(ox, oy, 0, ox, oy, rr);
+        g.addColorStop(0, hexA('#ffffff', 0.34));
+        g.addColorStop(0.6, hexA(col, 0.16));
+        g.addColorStop(1, hexA(col, 0));
+        ctx.fillStyle = g; ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+      continue;
+    }
     if (s.kind === 'reflectPool') {
       // Missing-Moon Lake (Moonless): a glowing reflecting pool with ripple rings + a
       // shimmering moon highlight. (A slick surface lives under it — you slide across.)
@@ -922,7 +950,18 @@ function drawPickups(room, pal) {
     const bob = Math.sin(t * 4 + q.x * 0.01) * 3;
     ctx.save();
     ctx.translate(q.x, q.y + bob - (q.level || 0) * TIER_LIFT);
-    if (q.type === 'spark') {
+    if (q.type === 'gem') {
+      // a spinning faceted gem with a hot core + rotating sparkle — clearly the prize
+      ctx.rotate(t * 1.1);
+      ctx.shadowColor = '#bdeaff'; ctx.shadowBlur = 18;
+      ctx.globalAlpha = 0.9; ctx.fillStyle = '#bdeaff';
+      const s = 13 + Math.sin(t * 3) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -s); ctx.lineTo(s * 0.7, -s * 0.15); ctx.lineTo(s * 0.45, s);
+      ctx.lineTo(-s * 0.45, s); ctx.lineTo(-s * 0.7, -s * 0.15); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.moveTo(0, -s * 0.55); ctx.lineTo(s * 0.28, 0); ctx.lineTo(0, s * 0.5); ctx.lineTo(-s * 0.28, 0); ctx.closePath(); ctx.fill();
+    } else if (q.type === 'spark') {
       ctx.fillStyle = pal.accent2;
       ctx.shadowColor = pal.accent2; ctx.shadowBlur = 9;
       starPath(ctx, 0, 0, 5.5, 2.4, 4); ctx.fill();
@@ -1203,21 +1242,52 @@ function drawBossIntro(room) {
 function drawBossBar(room) {
   const boss = room.enemies.find(e => e.boss && e.hp > 0);
   if (!boss) return;
-  const w = Math.min(420, view.W * 0.6), h = 10;
-  const x = (view.W - w) / 2, y = 64;
+  if ((boss.introT || 0) > 0) return; // hold the bar back until the name-slam finishes
+  const t = room.time || performance.now() / 1000;
+  const frac = clamp(boss.hp / boss.maxHp, 0, 1);
+  // a white "ghost" sliver lags behind the real HP so each big hit reads as a chunk torn off
+  boss._hpGhost = boss._hpGhost == null ? frac : boss._hpGhost + (frac - boss._hpGhost) * 0.10;
+  const ghost = Math.max(frac, boss._hpGhost);
+  const enraged = !!boss.enraged, desperate = !!boss.desperate;
+  const hot = desperate ? '#ff5d6c' : enraged ? '#ff9b4a' : boss.color;
+  const w = Math.min(560, view.W * 0.66), h = 16;
+  const x = (view.W - w) / 2, y = 60;
+  const pulse = enraged ? 0.5 + Math.sin(t * (desperate ? 12 : 7)) * 0.5 : 0;
   ctx.save();
   ctx.textAlign = 'center';
-  ctx.font = '900 14px Inter, system-ui, sans-serif';
-  ctx.fillStyle = boss.color;
-  ctx.shadowColor = boss.color; ctx.shadowBlur = 12;
-  ctx.fillText(boss.display.toUpperCase(), view.W / 2, y - 8);
+  // name
+  ctx.font = '900 18px Inter, system-ui, sans-serif';
+  ctx.fillStyle = hot; ctx.shadowColor = hot; ctx.shadowBlur = 14 + pulse * 16;
+  ctx.fillText(boss.display.toUpperCase(), view.W / 2, y - 13);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(0,0,0,.5)';
-  ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-  ctx.fillStyle = boss.color;
-  ctx.fillRect(x, y, w * clamp(boss.hp / boss.maxHp, 0, 1), h);
-  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
-  ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+  // frame backing
+  ctx.fillStyle = 'rgba(0,0,0,.55)';
+  roundRectPath(ctx, x - 4, y - 4, w + 8, h + 8, 7); ctx.fill();
+  // recent-damage ghost trail
+  ctx.fillStyle = hexA('#ffffff', 0.30);
+  ctx.fillRect(x, y, w * ghost, h);
+  // HP fill (lit gradient)
+  const g = ctx.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, mixHex(hot, '#ffffff', 0.28));
+  g.addColorStop(1, hot);
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w * frac, h);
+  // enrage shimmer riding the fill
+  if (enraged) { ctx.globalAlpha = 0.28 * pulse; ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w * frac, h); ctx.globalAlpha = 1; }
+  // phase notches at the 50% and 25% thresholds (when the boss transforms / panics)
+  ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 2;
+  for (const f of [0.5, 0.25]) { ctx.beginPath(); ctx.moveTo(x + w * f, y); ctx.lineTo(x + w * f, y + h); ctx.stroke(); }
+  // frame stroke (glows with the enrage pulse)
+  ctx.strokeStyle = hexA(hot, 0.55 + pulse * 0.45); ctx.lineWidth = 1.6;
+  roundRectPath(ctx, x - 4, y - 4, w + 8, h + 8, 7); ctx.stroke();
+  // status tag under the bar
+  if (desperate || enraged) {
+    ctx.globalAlpha = desperate ? 0.7 + pulse * 0.3 : 0.85;
+    ctx.font = '800 11px Inter, system-ui, sans-serif';
+    ctx.fillStyle = hot;
+    ctx.fillText(desperate ? '⚠  FINAL STAND  ⚠' : 'ENRAGED', view.W / 2, y + h + 14);
+    ctx.globalAlpha = 1;
+  }
   ctx.restore();
 }
 

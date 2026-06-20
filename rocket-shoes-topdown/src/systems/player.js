@@ -442,7 +442,7 @@ function segmentPointDist(x1, y1, x2, y2, px, py) {
 function dashBreakCrossedObstacles(p, room, x0, y0, x1, y1) {
   for (const o of room.obstacles) {
     if (o.gone || !o.breakable) continue;
-    const priority = o.wall || o.species === 'annexDoor' || o.species === 'wallSegment';
+    const priority = o.wall || o.dashKey || o.species === 'annexDoor' || o.species === 'wallSegment';
     const pad = p.r + (priority ? 18 : 8);
     if (segmentHitsObstacle(x0, y0, x1, y1, o, pad)) damageObstacle(room, o, priority ? 999 : p.damage * 3.0);
   }
@@ -544,8 +544,23 @@ function skyRailPoint(r, u) {
   u = clamp(u, 0, 1);
   const dx = r.x2 - r.x1, dy = r.y2 - r.y1;
   const len = Math.hypot(dx, dy) || 1;
-  const tx = dx / len, ty = dy / len;
-  return { x: r.x1 + dx * u, y: r.y1 + dy * u, tx, ty, nx: -ty, ny: tx, u, len };
+  if (!r.bow) {
+    const tx = dx / len, ty = dy / len;
+    return { x: r.x1 + dx * u, y: r.y1 + dy * u, tx, ty, nx: -ty, ny: tx, u, len };
+  }
+  // Twisting rail: bow the chord by a sine wave (r.twists arcs). The ride is parametric on
+  // this function, so the grind follows the curve exactly — and we return the analytic
+  // tangent so the player faces along the twist (and peel-off uses the curve's normal).
+  const cnx = -dy / len, cny = dx / len; // chord normal
+  const k = r.twists || 1;
+  const s = Math.sin(u * Math.PI * k), c = Math.cos(u * Math.PI * k);
+  const off = r.bow * s;
+  const x = r.x1 + dx * u + cnx * off;
+  const y = r.y1 + dy * u + cny * off;
+  let tx = dx + cnx * r.bow * Math.PI * k * c;
+  let ty = dy + cny * r.bow * Math.PI * k * c;
+  const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+  return { x, y, tx, ty, nx: -ty, ny: tx, u, len };
 }
 
 // ── Express escape rail (spawned on room clear, rooms.js spawnEscapeRail) ──

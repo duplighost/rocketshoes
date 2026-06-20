@@ -75,6 +75,17 @@ function collect(room, p, q) {
     case 'core':
       grantItem(q.itemId, 'found');
       break;
+    case 'gem':
+      // The special secret-reward gem: a jackpot. +1 max HP & full heal, a damage + fire
+      // bump, and a guaranteed graft if one was seeded with it.
+      p.maxHp += 1; p.hp = p.maxHp;
+      p.perks.damage += 1; p.perks.fire += 1;
+      if (q.itemId) grantItem(q.itemId, 'found');
+      addFloat(room, p.x, p.y - 48, '✦ GEM ✦', '#bdeaff', true, 1.3);
+      burst(room, q.x, q.y, '#bdeaff', 28, 260, 0.65, 4.2);
+      burst(room, q.x, q.y, '#ffffff', 14, 160, 0.4, 3);
+      sfx('clear'); sfx('care');
+      break;
     default:
       sfx('pickup');
   }

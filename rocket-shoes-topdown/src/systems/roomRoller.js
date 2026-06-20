@@ -73,8 +73,9 @@ export function rollRoom(run, round) {
     districts: [], flowLanes: [], skyRails: [], skyways: [], signs: [], traffic: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
     // XL city-scale sprawl — bigger than either fork. Density (cover, rooftops, rails,
     // surfaces, landmarks, enemy budget) all scale with area below so it stays packed.
-    w: Math.round((portrait ? rand(rng, 2750, 3350) : rand(rng, bossId ? 5200 : 6900, bossId ? 6200 : 8600)) * sizeScale * deviceScale),
-    h: Math.round((portrait ? rand(rng, 3850, 4750) : rand(rng, bossId ? 4000 : 4900, bossId ? 4900 : 6100)) * sizeScale * deviceScale),
+    // Bigger arenas (~25% up): more room to grind, build, and hide secrets in.
+    w: Math.round((portrait ? rand(rng, 3200, 3900) : rand(rng, bossId ? 6400 : 8700, bossId ? 7600 : 11000)) * sizeScale * deviceScale),
+    h: Math.round((portrait ? rand(rng, 4500, 5600) : rand(rng, bossId ? 4900 : 6200, bossId ? 6100 : 7700)) * sizeScale * deviceScale),
     wall: ROOM.WALL,
     obstacles: [], landmarks: [], annex: null, hazards: [], lanes: [], edgeRail: { phase: rng() * TAU },
     enemies: [], bullets: [], pickups: [], particles: [], floats: [],
@@ -233,6 +234,10 @@ export function rollRoom(run, round) {
   const compass = stacks(run.player, 'cacheCompass');
   const annexChance = ANNEX.CHANCE + compass * 0.12;
   if (!bossId && !partitioned && chance(rng, annexChance)) buildAnnex(room, rng);
+
+  // ── secret #1: a straight dash-run through the clouds to a power gem. Only a DASH
+  // punches through the cloud gates; the prize sits in a sealed pocket at the far end. ──
+  if (!bossId) seedCloudRun(room, rng, px, py, portalX, portalY);
 
   // ── axis 3: hazard kit ──
   seedHazards(room, rng);
@@ -845,10 +850,14 @@ function seedSkyRails(room, rng) {
     used.add(k);
     connected.add(pair.a.id); connected.add(pair.b.id);
     const A = point(pair.a, trunk ? 0.16 : 0.24), B = point(pair.b, trunk ? 0.16 : 0.24);
+    // Some rails TWIST: a sine-bow across the span (1-2 arcs), so the grind weaves instead
+    // of running dead-straight. The trunk spine stays straight (it's the readable highway).
+    const span = dist(A.x, A.y, B.x, B.y);
+    const bow = (!trunk && span > 520 && chance(rng, 0.5)) ? rand(rng, 0.16, 0.32) * span * (chance(rng, 0.5) ? 1 : -1) : 0;
     room.skyRails.push({
       x1: A.x, y1: A.y, x2: B.x, y2: B.y,
       level: 1, width: trunk ? 58 : 46, boost: trunk ? 1500 : 1320,
-      trunk,
+      trunk, bow, twists: bow ? randi(rng, 1, 2) : 0,
       color: chance(rng, 0.5) ? room.biome.pal.accent2 : room.biome.pal.accent3,
       phase: rng() * TAU,
     });
@@ -1206,13 +1215,17 @@ function buildAnnex(room, rng) {
     break;
   }
   if (!rect) return false;
-  const ambush = chance(rng, ANNEX.AMBUSH);
+  // secret #2: some sealed vaults are deep UNDERVAULTS — break the hatch and the floor
+  // gives way to a buried chamber holding the special gem. Never an ambush (the descent
+  // IS the payoff), darker themed, rarer than the ordinary cache.
+  const underground = chance(rng, room.round >= 1 ? 0.30 : 0.18);
+  const ambush = !underground && chance(rng, ANNEX.AMBUSH);
   room.annex = {
-    side, rect, doorRect, opened: false, cx, cy,
+    side, rect, doorRect, opened: false, cx, cy, underground,
     kind: ambush ? 'ambush' : 'secret',
     ambushType: pick(rng, ['skitter', 'skitter', 'gunner']),
     ambushCount: randi(rng, 2, 3),
-    reward: pick(rng, ['heart', 'repair', 'marrow']),
+    reward: underground ? 'gem' : pick(rng, ['heart', 'repair', 'marrow']),
   };
   const wall = (x, y, w, h) => ({ type: 'rect', x, y, w, h, style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity, archKind: 'interiorAnnex' });
   if (side === 'n') {
@@ -1241,11 +1254,89 @@ function buildAnnex(room, rng) {
     );
   }
   room.obstacles.push({
-    type: 'rect', ...doorRect, style: 'door', wall: true,
+    type: 'rect', ...doorRect, style: 'door', wall: true, underground,
     breakable: true, species: 'annexDoor', hp: SPECIES.annexDoor.hp + room.idx,
   });
-  room.landmarks.push({ kind: 'annexVault', x: cx, y: cy });
+  room.landmarks.push({ kind: underground ? 'undervault' : 'annexVault', x: cx, y: cy });
   return true;
+}
+
+// Secret #1 — the cloud dash-run. A straight, side-walled chute filled with cloud gates
+// that only a DASH can punch through (they shrug off bullets), capped by a sealed pocket
+// holding a power gem. A dead-end spur, validated so it can never strand the portal.
+function seedCloudRun(room, rng, px, py, portalX, portalY) {
+  if (!chance(rng, room.round >= 2 ? 0.24 : 0.15)) return false;
+  const margin = room.wall + 200;
+  const thick = 22, halfW = 86;
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const onTier = (x, y, pad) => (room.tiers || []).some(t => x > t.x - pad && x < t.x + t.w + pad && y > t.y - pad && y < t.y + t.h + pad);
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const [dx, dy] = pick(rng, dirs);
+    const L = rand(rng, 540, 820);
+    // mouth (open end) somewhere reachable-ish in the interior
+    const mx = rand(rng, margin + 120, room.w - margin - 120);
+    const my = rand(rng, margin + 120, room.h - margin - 120);
+    const fx = mx + dx * L, fy = my + dy * L;                 // closed end
+    // full footprint (chute + walls) must sit inside the playable inset
+    const xLo = Math.min(mx, fx) - (dx ? 0 : halfW + thick);
+    const xHi = Math.max(mx, fx) + (dx ? 0 : halfW + thick);
+    const yLo = Math.min(my, fy) - (dy ? 0 : halfW + thick);
+    const yHi = Math.max(my, fy) + (dy ? 0 : halfW + thick);
+    if (xLo < margin || yLo < margin || xHi > room.w - margin || yHi > room.h - margin) continue;
+    if (dist(mx, my, px, py) < ROOM.SPAWN_CLEAR + 80) continue;
+    if (dist(fx, fy, portalX, portalY) < 240 || dist(mx, my, portalX, portalY) < 200) continue;
+    // the whole footprint must be open ground (no obstacles, tiers, or protected lanes)
+    let clear = true;
+    for (let t = -0.05; t <= 1.05 && clear; t += 0.1) {
+      const cxp = mx + dx * L * t, cyp = my + dy * L * t;
+      if (pointBlockedForSpawn(room, cxp, cyp, halfW + thick + 20) || onTier(cxp, cyp, 70)) clear = false;
+    }
+    if (!clear) continue;
+    const nx = -dy, ny = dx;                                   // unit perpendicular (axis-aligned)
+    const wallObj = (x, y, w, h) => ({ type: 'rect', x, y, w: Math.max(10, w), h: Math.max(10, h), style: 'boundary', solidWall: true, wall: true, ledgeHeight: Infinity, archKind: 'cloudChute' });
+    const before = room.obstacles.length, beforeFx = room.setpieces.length, beforePk = room.pickups.length;
+    // two side rails + a back cap on the closed end
+    const sideA = dx
+      ? wallObj(Math.min(mx, fx), my + halfW, L, thick)
+      : wallObj(mx + halfW, Math.min(my, fy), thick, L);
+    const sideB = dx
+      ? wallObj(Math.min(mx, fx), my - halfW - thick, L, thick)
+      : wallObj(mx - halfW - thick, Math.min(my, fy), thick, L);
+    const back = dx
+      ? wallObj(fx - (dx > 0 ? 0 : thick), my - halfW - thick, thick, halfW * 2 + thick * 2)
+      : wallObj(mx - halfW - thick, fy - (dy > 0 ? 0 : thick), halfW * 2 + thick * 2, thick);
+    room.obstacles.push(sideA, sideB, back);
+    // cloud gates strung down the centre — dash-only barricades (huge hp shrugs off shots)
+    const gates = clamp(Math.round(L / 118), 3, 6);
+    for (let i = 1; i <= gates; i++) {
+      const t = i / (gates + 1);
+      room.obstacles.push({
+        type: 'circle', x: mx + dx * L * t, y: my + dy * L * t, rad: halfW * 0.92,
+        style: 'cloud', breakable: true, species: 'cloudGate', hp: 999, cloud: true, dashKey: true, phase: rng() * TAU,
+      });
+    }
+    // the gem, in the sealed pocket at the far end (persistent — no decay)
+    const gx = fx - dx * 70, gy = fy - dy * 70;
+    room.pickups.push({ type: 'gem', x: gx, y: gy, vx: 0, vy: 0, r: 13, life: Infinity, level: 0, secret: 'cloud', phase: rng() * TAU });
+    // soft non-colliding cloud banks frame the run as a sky corridor
+    for (let i = 0; i <= gates + 1; i++) {
+      const t = i / (gates + 1);
+      const bx = mx + dx * L * t, by = my + dy * L * t;
+      room.setpieces.push({ kind: 'cloudBank', x: bx + nx * (halfW + 30), y: by + ny * (halfW + 30), r: rand(rng, 30, 46), level: 0, color: '#d4ecff', phase: rng() * TAU });
+      room.setpieces.push({ kind: 'cloudBank', x: bx - nx * (halfW + 30), y: by - ny * (halfW + 30), r: rand(rng, 30, 46), level: 0, color: '#d4ecff', phase: rng() * TAU });
+    }
+    // validate: portal still reachable AND the mouth still reachable from spawn
+    const reach = reachableFrom(room, px, py);
+    if (!reach.has(portalX, portalY) || !reach.has(mx, my)) {
+      room.obstacles.length = before;
+      room.setpieces.length = beforeFx;
+      room.pickups.length = beforePk;
+      continue;
+    }
+    room.landmarks.push({ kind: 'cloudRun', x: (mx + fx) / 2, y: (my + fy) / 2 });
+    return true;
+  }
+  return false;
 }
 
 // ── Neon districts + flow lanes (ported from ChatGPT's "neon districts" build) ──
@@ -1635,10 +1726,24 @@ function bakeBackground(room, rng) {
 
   // annex floor tint
   if (room.annex) {
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = pal.bg;
-    ctx.fillRect(room.annex.rect.x, room.annex.rect.y, room.annex.rect.w, room.annex.rect.h);
-    ctx.globalAlpha = 1;
+    const ar = room.annex.rect;
+    if (room.annex.underground) {
+      // an UNDERVAULT reads as a black pit cut into the floor, ringed with hazard grating
+      ctx.globalAlpha = 0.86; ctx.fillStyle = '#05060a';
+      ctx.fillRect(ar.x, ar.y, ar.w, ar.h);
+      ctx.globalAlpha = 0.5; ctx.strokeStyle = hexA(pal.accent2, 0.9); ctx.lineWidth = 3;
+      for (let gy = ar.y + 18; gy < ar.y + ar.h - 8; gy += 26) { ctx.beginPath(); ctx.moveTo(ar.x + 8, gy); ctx.lineTo(ar.x + ar.w - 8, gy); ctx.stroke(); }
+      ctx.globalAlpha = 0.28;
+      const gg = ctx.createRadialGradient(ar.x + ar.w / 2, ar.y + ar.h / 2, 4, ar.x + ar.w / 2, ar.y + ar.h / 2, Math.max(ar.w, ar.h) * 0.6);
+      gg.addColorStop(0, hexA('#bdeaff', 0.5)); gg.addColorStop(1, hexA('#bdeaff', 0));
+      ctx.fillStyle = gg; ctx.fillRect(ar.x, ar.y, ar.w, ar.h);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = pal.bg;
+      ctx.fillRect(ar.x, ar.y, ar.w, ar.h);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // biome lighting grade: a faint accent glow toward the portal gives each biome a

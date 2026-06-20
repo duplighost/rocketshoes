@@ -4,8 +4,9 @@
 import { state } from '../state.js';
 import { TAU, DIRECTOR, HUNT } from '../config.js';
 import { clamp, damp, dist, norm } from '../rng.js';
-import { particle, addFloat } from '../render/particles.js';
+import { particle, addFloat, burst, ripple } from '../render/particles.js';
 import { fireEnemyBurst, fireEnemyRing, fireEnemyShot } from './bullets.js';
+import { addShake, addFlash, slowMo } from './juice.js';
 import { hurtPlayer } from './combat.js';
 import { resolveCircleObstacle } from './player.js';
 import { ENEMY_TYPES } from '../data/enemies.js';
@@ -249,8 +250,38 @@ function separate(room) {
 // Boss brains live in data/bosses via director (Phase 5); placeholder hook keeps
 // the switch clean — returns true to fall through to normal AI.
 function updateBoss(e, room, p, to, d, dt) {
-  if (e.brain) { e.brain(e, room, p, to, d, dt); return false; }
+  if (e.brain) {
+    e.brain(e, room, p, to, d, dt);
+    maybeBossDesperation(e, room);   // shared FINAL STAND across every boss
+    return false;
+  }
   return true;
+}
+
+// Final stand: dropping a boss below 25% HP ROARS it into a desperation phase — a fair
+// bullet-wipe, a screen-rocking double shockwave, a speed/aggression spike, and an
+// instant closing barrage. Every boss gets this climax on top of its own 50% phase
+// shift, so the last quarter of the bar is always the loudest. One-shot via e.desperate.
+function maybeBossDesperation(e, room) {
+  if (e.desperate || (e.introT || 0) > 0 || e.hp <= 0) return;
+  if (e.hp / e.maxHp >= 0.25) return;
+  const p = state.run.player;
+  e.desperate = true;
+  e.enraged = true;
+  e.invulnT = Math.max(e.invulnT || 0, 0.6);
+  e.phaseLock = Math.max(e.phaseLock || 0, 0.6);
+  e.speed *= 1.14;
+  e.fireCd = 0; e.ringCd = 0;                                  // resume firing hot
+  for (const b of room.bullets) if (b.owner === 'enemy') b.life = 0; // fair reset, never reassign mid-loop
+  fireEnemyRing(room, e, 22, 248, 4.2, '#ff5d6c', e.phase);
+  fireEnemyRing(room, e, 16, 198, 3.5, '#ffffff', e.phase + 0.3);
+  burst(room, e.x, e.y, '#ff5d6c', 52, 520, 0.9, 5.5);
+  ripple(room, e.x, e.y, '#ffffff', 380, 1.1);
+  ripple(room, e.x, e.y, '#ff5d6c', 270, 0.95);
+  addFlash(0.55); addShake(1.05); slowMo(0.5);
+  addFloat(room, e.x, e.y - e.r - 40, 'FINAL STAND', '#ff5d6c', true, 1.6);
+  if (p) { addFloat(room, p.x, p.y - 70, e.display.toUpperCase() + ' IS DESPERATE', '#ff9b9b', false, 0.7); }
+  sfx('pulse'); sfx('clear');
 }
 
 export function spawnTelegraphed(room, type, x, y, delay = 0.55, captain = null) {

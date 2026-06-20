@@ -27,6 +27,7 @@ export const SPECIES = {
   cacheAltar:     { hp: 8, label: 'Moon Cache' },
   gambitAltar:    { hp: 11, label: 'Gambit Shrine' },
   mirrorVault:    { hp: 10, label: 'Mirror Vault' },
+  cloudGate:      { hp: 999, label: 'Cloud Gate' },
 };
 
 export function damageObstacle(room, o, dmg) {
@@ -107,6 +108,12 @@ const effects = {
     // without paying the full loot-piñata cost.
     if (Math.random() < 0.55) scatterSparks(room, x, y, 1);
   },
+  cloudGate(room, o, x, y) {
+    // A puff of vapour as the dash punches through — no loot (the gem at the end is the prize).
+    burst(room, x, y, '#eaf6ff', 16, 150, 0.5, 3.4);
+    burst(room, x, y, '#bdeaff', 8, 90, 0.36, 2.4);
+    ripple(room, x, y, '#dff0ff', 96, 0.3);
+  },
   wallSegment(room, o, x, y) {
     // the divider is breached — a wide passage opens
     addFloat(room, x, y - 20, '✦', room.biome.pal.accent2, true, 0.55);
@@ -133,6 +140,14 @@ const effects = {
         if (q) { q.rushX = rush.x * (280 + i * 45); q.rushY = rush.y * (280 + i * 45); }
       }
       ripple(room, x, y, room.biome.pal.bad, 150, 0.34);
+    } else if (annex.underground) {
+      // the floor gives way — a buried undervault opens onto the special gem
+      addFloat(room, x, y - 26, '⊕ UNDERVAULT', '#bdeaff', true, 0.62);
+      addShake(0.22); hitPause('pulse');
+      ripple(room, annex.cx, annex.cy, '#bdeaff', 188, 0.5);
+      burst(room, annex.cx, annex.cy, '#bdeaff', 26, 240, 0.6, 4);
+      dropPickup(room, annex.reward, annex.cx, annex.cy, { life: Infinity, secret: 'undervault' });
+      scatterSparks(room, annex.cx, annex.cy, 6);
     } else {
       addFloat(room, x, y - 24, '◆', '#ffd36e', true, 0.58);
       dropPickup(room, annex.reward, annex.cx, annex.cy);
