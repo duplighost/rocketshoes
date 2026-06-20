@@ -189,7 +189,7 @@ export function buildWaves(room, rng) {
   // High ground should be a reason to climb, not a single novelty perch.
   // Seed multiple upper-layer enemies so rails/vents turn into a real combat route.
   if (room.tiers && room.tiers.length) {
-    const perches = room.tiers.slice(0, view.mobile ? 2 : 4);
+    const perches = room.tiers.slice(0, 4); // device parity: same high-ground combat on phone + desktop
     for (let i = 0; i < perches.length; i++) {
       const t = perches[i];
       const perch = ENEMY_TYPES.sniper.from <= round && i % 2 === 0 ? 'sniper'

@@ -18,6 +18,18 @@ import { MUTATORS } from '../data/mutators.js';
 import { FLOORPLANS, FLOORPLAN_IDS } from '../data/floorplans.js';
 import { seedRoomShop } from './shop.js';
 
+// ── DEVICE PARITY ──────────────────────────────────────────────────────────
+// The top-down game plays IDENTICALLY on phone and desktop: same map sizes, the same
+// rooftop lattice + sky rails, the same district density. The generator used to shrink
+// and thin everything on mobile — that's what made phones feel like a different, smaller
+// game. With parity on, `genMobile()` reports false everywhere in generation, so every
+// device rolls the desktop world. (Only two things stay screen-aware, on purpose: the
+// camera zoom in camera.js — a small screen needs it — and the baked-texture memory cap
+// in chooseBackgroundScale. Neither changes the actual map.) Set MOBILE_PARITY = false
+// to restore the old lighter phone profile.
+const MOBILE_PARITY = true;
+function genMobile() { return view.mobile && !MOBILE_PARITY; }
+
 export function rollRoom(run, round) {
   const rng = run.rng;
   const bags = run.bags;
@@ -61,10 +73,10 @@ export function rollRoom(run, round) {
   }
   const sizeScale = mutator?.sizeScale || 1;
 
-  const portrait = view.mobile && view.portrait;
+  const portrait = genMobile() && view.portrait;
   // Giant sprawl on desktop; phones pull the landscape size back (portrait stays modest).
   // Safe to go big: floor/lanes are viewport-culled and the enemy budget is already capped.
-  const deviceScale = view.mobile ? (portrait ? 1 : 0.7) : 1;
+  const deviceScale = genMobile() ? (portrait ? 1 : 0.7) : 1;
   const room = {
     round, idx: depthIdx(round), stage: dangerStage(round, run.overdrive),
     biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
@@ -252,7 +264,7 @@ export function rollRoom(run, round) {
 
   // ── ambient particles ──
   // ambient drift fills the sprawl with life (the cheap, non-obstructive kind of "full")
-  const ambN = Math.round((view.mobile ? 48 : 96) * Math.min(4.2, Math.sqrt(roomAreaScale(room))));
+  const ambN = Math.round((genMobile() ? 48 : 96) * Math.min(4.2, Math.sqrt(roomAreaScale(room))));
   for (let i = 0; i < ambN; i++) {
     room.ambient.push({
       type: pick(rng, biome.ambient), x: rng() * room.w, y: rng() * room.h,
@@ -460,7 +472,7 @@ function sanitizePendingSpawns(room, rng, px, py, portalX, portalY) {
   // a big-room wall structure can make a random edge spawn technically legal
   // but unreachable — the worst kind of haunted bullshit.
   room.spawnAnchors = [];
-  for (let i = 0; i < (view.mobile ? 28 : 42); i++) {
+  for (let i = 0; i < (genMobile() ? 28 : 42); i++) {
     const p = findReachableSpawn(room, rng, reach, px, py);
     if (!room.spawnAnchors.some(a => dist(a.x, a.y, p.x, p.y) < 125)) room.spawnAnchors.push(p);
   }
@@ -555,15 +567,15 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // Fewer rooftop platforms than the website build: the second layer was a major source
   // of overlapping silhouettes. Still a real lattice (rails + high-ground routes), just
   // legible instead of a stacked thicket.
-  const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? (partitioned ? 5 : 6) : (partitioned ? 9 : 12);
+  const cap = room.bossId ? (genMobile() ? 4 : 6) : genMobile() ? (partitioned ? 5 : 6) : (partitioned ? 9 : 12);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
   const target = room.bossId
-    ? clamp(view.mobile ? 3 : 4, 3, cap)
-    : clamp((partitioned ? 3 : 5) + (room.idx >= 4 ? 1 : 0) + (room.idx >= 7 && !view.mobile ? 1 : 0), view.mobile ? 3 : 4, cap);
+    ? clamp(genMobile() ? 3 : 4, 3, cap)
+    : clamp((partitioned ? 3 : 5) + (room.idx >= 4 ? 1 : 0) + (room.idx >= 7 && !genMobile() ? 1 : 0), genMobile() ? 3 : 4, cap);
   for (let tries = 0; room.tiers.length < target && tries < cap * 4; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
-  const minRoofs = room.bossId ? (view.mobile ? 3 : 5) : (view.mobile ? 4 : 6);
+  const minRoofs = room.bossId ? (genMobile() ? 3 : 5) : (genMobile() ? 4 : 6);
   if (room.tiers.length < minRoofs) made += seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, cap);
   return made;
 }
@@ -577,8 +589,8 @@ function seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, 
   let made = 0;
   const pushTier = (rect, districtId = null) => {
     if (room.tiers.length >= cap) return false;
-    const tw = clamp(rect.w, view.mobile ? 230 : 300, view.mobile ? 560 : 760);
-    const th = clamp(rect.h, view.mobile ? 180 : 220, view.mobile ? 430 : 560);
+    const tw = clamp(rect.w, genMobile() ? 230 : 300, genMobile() ? 560 : 760);
+    const th = clamp(rect.h, genMobile() ? 180 : 220, genMobile() ? 430 : 560);
     const tx = clamp(rect.x, room.wall + 96, room.w - room.wall - 96 - tw);
     const ty = clamp(rect.y, room.wall + 96, room.h - room.wall - 112 - th);
     const candidate = { x: tx, y: ty, w: tw, h: th };
@@ -596,8 +608,8 @@ function seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, 
   for (const d of districts) {
     if (room.tiers.length >= minRoofs || room.tiers.length >= cap) break;
     for (let tries = 0; tries < 5; tries++) {
-      const tw = clamp(d.w * rand(rng, 0.42, 0.62), view.mobile ? 230 : 300, view.mobile ? 520 : 720);
-      const th = clamp(d.h * rand(rng, 0.36, 0.55), view.mobile ? 180 : 220, view.mobile ? 390 : 520);
+      const tw = clamp(d.w * rand(rng, 0.42, 0.62), genMobile() ? 230 : 300, genMobile() ? 520 : 720);
+      const th = clamp(d.h * rand(rng, 0.36, 0.55), genMobile() ? 180 : 220, genMobile() ? 390 : 520);
       if (pushTier({ x: d.cx - tw / 2 + rand(rng, -d.w * 0.08, d.w * 0.08), y: d.cy - th / 2 + rand(rng, -d.h * 0.08, d.h * 0.08), w: tw, h: th }, d.id)) break;
     }
   }
@@ -609,8 +621,8 @@ function seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, 
     const c = typeof raw === 'number' ? raw % reach.cols : Number(String(raw).split(',')[0]);
     const r = typeof raw === 'number' ? Math.floor(raw / reach.cols) : Number(String(raw).split(',')[1]);
     const cx = c * CELL + CELL / 2, cy = r * CELL + CELL / 2;
-    const tw = rand(rng, view.mobile ? 240 : 320, view.mobile ? 420 : 560);
-    const th = rand(rng, view.mobile ? 180 : 220, view.mobile ? 330 : 440);
+    const tw = rand(rng, genMobile() ? 240 : 320, genMobile() ? 420 : 560);
+    const th = rand(rng, genMobile() ? 180 : 220, genMobile() ? 330 : 440);
     pushTier({ x: cx - tw / 2, y: cy - th / 2, w: tw, h: th }, null);
   }
   return made;
@@ -635,8 +647,8 @@ function seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap) 
     const d = entry.d;
     // Bigger rooftops: real standing room up top so the second layer is a place to fight
     // and flow across, not just landing pads. (Brought over from the rooftop-grid fork.)
-    const tw = clamp(d.w * rand(rng, 0.74, 0.94), view.mobile ? 320 : 400, view.mobile ? 780 : 1160);
-    const th = clamp(d.h * rand(rng, 0.64, 0.86), view.mobile ? 240 : 300, view.mobile ? 620 : 900);
+    const tw = clamp(d.w * rand(rng, 0.74, 0.94), genMobile() ? 320 : 400, genMobile() ? 780 : 1160);
+    const th = clamp(d.h * rand(rng, 0.64, 0.86), genMobile() ? 240 : 300, genMobile() ? 620 : 900);
     const rect = {
       x: d.cx - tw / 2 + rand(rng, -d.w * 0.06, d.w * 0.06),
       y: d.cy - th / 2 + rand(rng, -d.h * 0.06, d.h * 0.06),
@@ -667,8 +679,8 @@ function maybeTier(room, rng, px, py, portalX, portalY, opts = {}) {
 
 function tryPlaceTierRect(room, rng, px, py, portalX, portalY, rawRect, opts = {}) {
   const T = 26;
-  const tw = clamp(rawRect.w, view.mobile ? 270 : 330, view.mobile ? 820 : 1180);
-  const th = clamp(rawRect.h, view.mobile ? 200 : 240, view.mobile ? 700 : 900);
+  const tw = clamp(rawRect.w, genMobile() ? 270 : 330, genMobile() ? 820 : 1180);
+  const th = clamp(rawRect.h, genMobile() ? 200 : 240, genMobile() ? 700 : 900);
   const tx = clamp(rawRect.x, room.wall + 92, room.w - room.wall - 92 - tw);
   const ty = clamp(rawRect.y, room.wall + 92, room.h - room.wall - 120 - th);
   const rect = { x: tx, y: ty, w: tw, h: th };
@@ -715,9 +727,9 @@ function rectOverlap(a, b, margin = 0) {
 
 
 function ensureMinimumVerticality(room, rng, px, py, portalX, portalY) {
-  const minRoofs = room.bossId ? (view.mobile ? 2 : 4) : (view.mobile ? 3 : 4);
+  const minRoofs = room.bossId ? (genMobile() ? 2 : 4) : (genMobile() ? 3 : 4);
   if ((room.tiers || []).length >= minRoofs) return;
-  const cap = room.bossId ? (view.mobile ? 4 : 6) : view.mobile ? 6 : 11;
+  const cap = room.bossId ? (genMobile() ? 4 : 6) : genMobile() ? 6 : 11;
   const before = room.tiers.length;
   seedOpenRooftopFallback(room, rng, px, py, portalX, portalY, minRoofs, cap);
   pruneUnreachableTiers(room, px, py);
@@ -869,7 +881,7 @@ function seedSkyRails(room, rng) {
   // connector pass turns the upper layer into an actual network instead of islands.
   const far = [...pairs].sort((a, b) => b.d - a.d);
   add(far[0], true);
-  const maxRails = Math.min(view.mobile ? 9 : 22, pairs.length);
+  const maxRails = Math.min(genMobile() ? 9 : 22, pairs.length);
   const near = [...pairs].sort((a, b) => a.d - b.d);
   while (connected.size < tiers.length && room.skyRails.length < maxRails) {
     const bridge = near.find(p => !used.has(key(p.a, p.b)) && (connected.has(p.a.id) !== connected.has(p.b.id)));
@@ -893,7 +905,7 @@ function seedSkyRails(room, rng) {
 function seedHighGroundRewards(room, rng) {
   const tiers = room.tiers || [];
   if (!tiers.length) return;
-  const max = Math.min(view.mobile ? 3 : 6, tiers.length);
+  const max = Math.min(genMobile() ? 3 : 6, tiers.length);
   const ordered = [...tiers].sort((a, b) => (b.w * b.h) - (a.w * a.h));
   for (let i = 0; i < max; i++) {
     const t = ordered[i];
@@ -998,7 +1010,7 @@ function seedSurfaces(room, rng, px, py, portalX, portalY) {
   for (let i = 0, n = randi(rng, 1, 2) + sBonus; i < n; i++) addGround('tar', rand(rng, 120, 185), mixHexA(pal.bad, pal.bg, 0.5));
 
   // a slick or charge cap on a couple of rooftops, so the upper layer has its own feel.
-  const roofs = [...(room.tiers || [])].sort((a, b) => (b.w * b.h) - (a.w * a.h)).slice(0, view.mobile ? 1 : 3);
+  const roofs = [...(room.tiers || [])].sort((a, b) => (b.w * b.h) - (a.w * a.h)).slice(0, genMobile() ? 1 : 3);
   for (const t of roofs) {
     if (chance(rng, 0.5)) continue;
     const kind = chance(rng, 0.6) ? 'slick' : 'charge';
@@ -1026,7 +1038,7 @@ function seedDistrictLandmarks(room, rng, px, py, portalX, portalY) {
   const pal = room.biome.pal;
   const onTier = (x, y, pad = 0) => (room.tiers || []).some(t => x > t.x - pad && x < t.x + t.w + pad && y > t.y - pad && y < t.y + t.h + pad);
   const kinds = ['reflectPool', 'observatory', 'arcadeSpire'];
-  const target = view.mobile ? randi(rng, 1, 2) : randi(rng, 2, 3) + (roomAreaScale(room) > 7 ? 1 : 0);
+  const target = genMobile() ? randi(rng, 1, 2) : randi(rng, 2, 3) + (roomAreaScale(room) > 7 ? 1 : 0);
   for (let i = 0; i < target; i++) {
     for (let tries = 0; tries < 44; tries++) {
       const x = rand(rng, room.w * 0.18, room.w * 0.82);
@@ -1047,7 +1059,7 @@ function seedDistrictLandmarks(room, rng, px, py, portalX, portalY) {
 
 function seedLandmarkProps(room, rng, px, py, portalX, portalY) {
   const kinds = ['holoTower', 'moonPool', 'signalPylon', 'marketArch', 'ghostBillboard', 'bridgeMast', 'liftBeacon'];
-  const target = room.bossId ? randi(rng, 4, 7) : randi(rng, view.mobile ? 11 : 20, view.mobile ? 17 : 34);
+  const target = room.bossId ? randi(rng, 4, 7) : randi(rng, genMobile() ? 11 : 20, genMobile() ? 17 : 34);
   for (let tries = 0; tries < 300 && room.setpieces.length < target; tries++) {
     let x = rand(rng, room.wall + 190, room.w - room.wall - 190);
     let y = rand(rng, room.wall + 170, room.h - room.wall - 190);
@@ -1452,7 +1464,7 @@ function seedCityDressing(room, rng, px, py, portalX, portalY) {
 
   // Elevated transit rails between neighborhoods — depth without stealing pathing.
   // Trimmed for legibility: still reads as a layered skyline, far less background churn.
-  const skyCount = room.bossId ? randi(rng, 4, 6) : randi(rng, view.mobile ? 6 : 9, view.mobile ? 9 : 15);
+  const skyCount = room.bossId ? randi(rng, 4, 6) : randi(rng, genMobile() ? 6 : 9, genMobile() ? 9 : 15);
   for (let i = 0; i < skyCount && districts.length > 1; i++) {
     const a = pick(rng, districts);
     const options = districts.filter(d => d !== a).sort((u, v) => byDist(a, u) - byDist(a, v));
@@ -1468,7 +1480,7 @@ function seedCityDressing(room, rng, px, py, portalX, portalY) {
   // Tiny neon signage gives each slab a "place" without becoming cover (district-tinted).
   // Heavily trimmed: 46–76 floating words per room was the #1 readability offender —
   // they cluttered the playfield and read like UI. A handful per district is plenty.
-  const signCount = room.bossId ? randi(rng, 5, 8) : randi(rng, view.mobile ? 10 : 16, view.mobile ? 16 : 26);
+  const signCount = room.bossId ? randi(rng, 5, 8) : randi(rng, genMobile() ? 10 : 16, genMobile() ? 16 : 26);
   for (let i = 0; i < signCount && districts.length; i++) {
     const d = pick(rng, districts);
     const edge = randi(rng, 0, 3), pad = 36;
@@ -1485,7 +1497,7 @@ function seedCityDressing(room, rng, px, py, portalX, portalY) {
 
   // Baked traffic flecks along the boost roads — the metropolis feels inhabited.
   // Pulled back so the boost roads still glitter with motion without speckling the floor.
-  const trafficCount = room.bossId ? randi(rng, 38, 60) : randi(rng, view.mobile ? 80 : 120, view.mobile ? 130 : 190);
+  const trafficCount = room.bossId ? randi(rng, 38, 60) : randi(rng, genMobile() ? 80 : 120, genMobile() ? 130 : 190);
   for (let i = 0; i < trafficCount && lanes.length; i++) {
     const l = pick(rng, lanes);
     const at = rand(rng, 0.04, 0.96), dx = l.x2 - l.x1, dy = l.y2 - l.y1;
@@ -1686,6 +1698,8 @@ function roundRect(ctx, x, y, w, h, r) {
 function chooseBackgroundScale(room) {
   // Cap the baked canvas so giant rooms don't allocate a 100MB+ bitmap. We draw in
   // room-space and output at this fraction, then scale the image back up at draw time.
+  // This stays SCREEN-aware (not parity-gated): a phone can't safely allocate a desktop-
+  // sized bitmap, and it only affects baked-texture sharpness, never gameplay.
   const maxPixels = view.mobile ? 5_600_000 : 9_000_000;
   const maxDim = view.mobile ? 3072 : 4096;
   const byPixels = Math.sqrt(maxPixels / Math.max(1, room.w * room.h));

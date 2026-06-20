@@ -358,7 +358,7 @@ function finishPlayerFrame(p, room, sp, dt, movingIntent) {
     x: p.x, y: p.y, face: p.face, spin: dashSpinPhase(p), life: dashLike ? 0.22 : 0.16,
     dash: dashLike, moveFace: p.moveFace, animT: p.animT, rail: !!p.rail?.active, airZ: p.airZ || 0,
   });
-  const afterCap = dashLike ? (view.mobile ? 9 : 13) : (view.mobile ? 6 : 9);
+  const afterCap = dashLike ? 13 : 9; // device parity: same dash-trail length on phone + desktop
   if (p.after.length > afterCap) p.after.pop();
   for (let i = p.after.length - 1; i >= 0; i--) {
     p.after[i].life -= dt;

@@ -3,7 +3,7 @@
 
 export const TAU = Math.PI * 2;
 export const SAVE_KEY = 'oneRoomNoMoon.v1';
-export const VERSION = '2.1.0-rocket-shoes-topdown';
+export const VERSION = '2.2.0-rocket-shoes-topdown';
 
 export const ROOM = {
   W: 2050, H: 1460, H_PORTRAIT: 1820,   // base dims (the roller rolls actual sizes; these document the target)
@@ -56,12 +56,13 @@ export const CAPS = {
   // City-scale arenas: lift the ceilings so the sprawl stays full of action + flash.
   // Director budget scales with room area (see buildWaves); these are the hard caps.
   // TOP PLAYTEST DIAL: drop back if combat reads as soup or perf dips.
-  // XL arenas: a LOT of enemies on screen. Bigger than both forks; viewport culling +
-  // adaptive lowFx keep it affordable.
-  ENEMIES: { mobile: 58, desktop: 104 },
-  ENEMY_BULLETS: { mobile: 140, desktop: 240 },
-  PLAYER_BULLETS: { mobile: 110, desktop: 210 },
-  PARTICLES: { mobile: 190, desktop: 380 },
+  // DEVICE PARITY: mobile == desktop so the fight feels identical on a phone (same world,
+  // same enemy/bullet ceilings). Runtime adaptive quality (state.lowFx) still halves
+  // particles + drops bloom if frames stay slow — on either platform — so this is safe.
+  ENEMIES: { mobile: 104, desktop: 104 },
+  ENEMY_BULLETS: { mobile: 240, desktop: 240 },
+  PLAYER_BULLETS: { mobile: 210, desktop: 210 },
+  PARTICLES: { mobile: 380, desktop: 380 },
 };
 
 export const DIRECTOR = {
