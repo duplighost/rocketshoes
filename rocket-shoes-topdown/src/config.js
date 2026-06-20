@@ -3,7 +3,7 @@
 
 export const TAU = Math.PI * 2;
 export const SAVE_KEY = 'oneRoomNoMoon.v1';
-export const VERSION = '2.2.1-rocket-shoes-topdown';
+export const VERSION = '2.2.2-rocket-shoes-topdown';
 
 export const ROOM = {
   W: 2050, H: 1460, H_PORTRAIT: 1820,   // base dims (the roller rolls actual sizes; these document the target)
@@ -20,14 +20,14 @@ export const PLAYER = {
   // website build so traversal across the gigantic sprawl reads fast, not sluggish.
   SPEED: 432, ACCEL: 37, STOP: 42.0, TURN: 45, LATERAL: 20.0,
   MAX_SPEED_MULT: 1.36, DASH_SPEED_MULT: 6.75,
-  FIRE_DELAY: 0.15, DAMAGE: 0.88, SHOT_MULT: 0.72, SHOT_SPEED: 900,
-  // Bigger bolts: drawBullets renders these as proper glowing laser bolts (not specks),
-  // which also makes hits read + land better.
-  SHOT_R: 5.4, SHOT_LIFE: 1.14, TWIN_OFFSET: 6,
-  // Baseline shot homing — every player bolt curves gently toward an enemy roughly ahead
-  // of it (within the cone). A light assist that never feels auto-aimed; the hunterMycelia
+  FIRE_DELAY: 0.15, DAMAGE: 0.88, SHOT_MULT: 0.72, SHOT_SPEED: 1280,
+  // Small, fast bolts: drawBullets renders these as crisp glowing darts (not big lasers,
+  // not specks). Snappier to fire and read than the old fat bolts.
+  SHOT_R: 3.4, SHOT_LIFE: 1.14, TWIN_OFFSET: 6,
+  // Baseline shot homing — a faint nudge toward an enemy almost dead ahead (tight cone,
+  // short range, gentle curve). Deliberately light: aim still matters. The hunterMycelia
   // relic stacks on top with full-circle tracking.
-  SHOT_HOMING_TURN: 3.0, SHOT_HOMING_RANGE: 560, SHOT_HOMING_CONE: 0.24,
+  SHOT_HOMING_TURN: 1.2, SHOT_HOMING_RANGE: 420, SHOT_HOMING_CONE: 0.42,
   // Art-space gun offsets. firePlayer multiplies these by DRAW_SCALE so bullets leave the shrunken muzzle.
   EMITTER_Y: -16, EMITTER_LEN: 32,
   CRIT: 0.03, CRIT_MULT: 1.8,

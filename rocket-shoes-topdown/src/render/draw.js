@@ -1020,8 +1020,8 @@ function drawBullets(room) {
     ctx.save();
 
     if (b.owner === 'player' && !b.converted) {
-      // ── big badass laser bolt ──
-      const len = b.r * (b.primed ? 4.6 : 3.6) + Math.min(46, sp * 0.05);
+      // ── crisp laser dart (small + fast) ──
+      const len = b.r * (b.primed ? 4.2 : 3.4) + Math.min(26, sp * 0.024);
       const tx = b.x - ux * len, ty = b.y - uy * len;
       const hx = b.x + ux * b.r * 0.6, hy = b.y + uy * b.r * 0.6;
       ctx.lineCap = 'round';
