@@ -1538,36 +1538,110 @@ function distPointSegment(px, py, x1, y1, x2, y2) {
 }
 
 function paintNeonDistricts(ctx, room, rng, pal) {
+  const districts = room.districts || [];
+  // Functional clearings (spawn / exit / plaza) stay flat ground plates — you GO there,
+  // so they read as open landing places among the towers, never blocked by a building.
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter'; // additive: each neighborhood's distinct neon hue glows
-  // District slabs: big NON-COLLIDING city blocks under the fight, each its own neon colour.
-  for (const d of room.districts || []) {
-    ctx.save();
-    ctx.translate(d.cx, d.cy);
-    ctx.rotate(Math.sin(d.phase) * 0.035);
-    const x = -d.w / 2, y = -d.h / 2;
-    ctx.globalAlpha = d.kind === 'spawn' || d.kind === 'exit' ? 0.12 : 0.105;
-    ctx.fillStyle = d.color || pal.accent3;
-    roundRect(ctx, x, y, d.w, d.h, 22); ctx.fill();
-    ctx.globalAlpha = 0.24;
-    ctx.strokeStyle = d.color || pal.accent3;
-    ctx.lineWidth = d.kind === 'plaza' ? 4 : 2.2;
-    roundRect(ctx, x, y, d.w, d.h, 22); ctx.stroke();
-    const cols = clamp(Math.floor(d.w / 150), 3, 9);
-    const rows = clamp(Math.floor(d.h / 120), 2, 7);
-    ctx.globalAlpha = 0.14;
-    ctx.strokeStyle = d.kind === 'rail' ? pal.accent2 : d.color || pal.accent;
-    ctx.lineWidth = 1.4;
-    for (let c = 1; c < cols; c++) { const xx = x + (d.w * c) / cols; ctx.beginPath(); ctx.moveTo(xx, y + 18); ctx.lineTo(xx, y + d.h - 18); ctx.stroke(); }
-    for (let r = 1; r < rows; r++) { const yy = y + (d.h * r) / rows; ctx.beginPath(); ctx.moveTo(x + 18, yy); ctx.lineTo(x + d.w - 18, yy); ctx.stroke(); }
-    if (d.kind === 'reactor' || d.kind === 'plaza' || d.kind === 'exit') {
-      ctx.globalAlpha = 0.20; ctx.strokeStyle = pal.accent2; ctx.lineWidth = 3;
-      const rr = Math.min(d.w, d.h) * 0.26;
-      ctx.beginPath(); ctx.arc(0, 0, rr, 0, TAU); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, rr * 0.58, 0, TAU); ctx.stroke();
-    }
-    ctx.restore();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const d of districts) {
+    if (d.kind !== 'spawn' && d.kind !== 'exit' && d.kind !== 'plaza') continue;
+    ctx.globalAlpha = 0.10; ctx.fillStyle = d.color || pal.accent3;
+    roundRect(ctx, d.x, d.y, d.w, d.h, 22); ctx.fill();
+    ctx.globalAlpha = 0.22; ctx.strokeStyle = d.color || pal.accent3; ctx.lineWidth = d.kind === 'plaza' ? 4 : 2.5;
+    roundRect(ctx, d.x, d.y, d.w, d.h, 22); ctx.stroke();
+    ctx.globalAlpha = 0.18; ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2.4;
+    const rr = Math.min(d.w, d.h) * 0.30;
+    ctx.beginPath(); ctx.arc(d.cx, d.cy, rr, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(d.cx, d.cy, rr * 0.6, 0, TAU); ctx.stroke();
   }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // ── TOWERS: every neighbourhood slab is now a detailed tall building. Drawn back-to-
+  // front (painter's order by base Y) so nearer towers occlude farther ones → a real
+  // skyline instead of empty squares. Night-city palette (dark facades + neon windows)
+  // keeps the fight readable on top under the floor wash. ──
+  const towers = districts
+    .filter(d => d.kind !== 'spawn' && d.kind !== 'exit' && d.kind !== 'plaza')
+    .sort((a, b) => (a.y + a.h) - (b.y + b.h));
+  for (const d of towers) {
+    const bx = d.x, by = d.y, bw = d.w, bh = d.h;
+    let H = Math.min(bw, bh) * (0.6 + rng() * 0.8);
+    if (d.kind === 'rail' || d.kind === 'reactor' || d.kind === 'arcology') H *= 1.3;
+    H = clamp(H, 90, 400);
+    const topY = by - H;                 // roof top edge (up = -Y, matching the platforms)
+    const fTop = topY + bh;              // top of the visible front facade
+    const accent = d.color || pal.accent;
+
+    // base contact shadow grounds the tower
+    ctx.globalAlpha = 0.34; ctx.fillStyle = '#000000';
+    roundRect(ctx, bx + 6, by + bh - 8, bw, 22, 12); ctx.fill();
+
+    // body block (roof top → ground): dark night facade
+    ctx.globalAlpha = 1;
+    const body = ctx.createLinearGradient(0, topY, 0, by + bh);
+    body.addColorStop(0, mixHexA(pal.floor, '#000000', 0.50));
+    body.addColorStop(0.5, mixHexA(pal.bg, '#000000', 0.58));
+    body.addColorStop(1, mixHexA(pal.bg, '#000000', 0.74));
+    ctx.fillStyle = body;
+    roundRect(ctx, bx, topY, bw, bh + H, 7); ctx.fill();
+
+    // window grid on the front facade — lit windows glow (additive), dark ones recede
+    const cols = clamp(Math.floor(bw / 44), 3, 13);
+    const rows = clamp(Math.floor(H / 38), 2, 11);
+    const padX = 12, padTop = 10, padBot = 12;
+    const cellW = (bw - padX * 2) / cols, cellH = (H - padTop - padBot) / rows;
+    const winW = Math.max(3, cellW * 0.6), winH = Math.max(3, cellH * 0.56);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const wx = bx + padX + c * cellW + (cellW - winW) / 2;
+        const wy = fTop + padTop + r * cellH + (cellH - winH) / 2;
+        if (rng() < 0.45) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.5 + rng() * 0.4;
+          ctx.fillStyle = rng() < 0.66 ? accent : '#ffe6a8';   // neon hue or warm light
+          ctx.fillRect(wx, wy, winW, winH);
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.globalAlpha = 0.5; ctx.fillStyle = mixHexA(pal.bg, '#000000', 0.5);
+          ctx.fillRect(wx, wy, winW, winH);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // roof face (lit toward the top) + neon edge trim. NOTE: grid-district colours are
+    // hsl() strings, which mixHexA (hex-only) can't blend — so keep `accent` to direct
+    // fillStyle/strokeStyle and lighten the roof with white via mixHexA instead.
+    const roof = ctx.createLinearGradient(0, topY, 0, topY + bh);
+    roof.addColorStop(0, mixHexA(pal.floor, '#ffffff', 0.10));
+    roof.addColorStop(1, mixHexA(pal.bg, '#000000', 0.42));
+    ctx.fillStyle = roof; roundRect(ctx, bx, topY, bw, bh, 7); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.22; ctx.fillStyle = accent;             // accent wash tints the roof
+    roundRect(ctx, bx, topY, bw, bh, 7); ctx.fill();
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = accent; ctx.lineWidth = 2.2;
+    roundRect(ctx, bx, topY, bw, bh, 7); ctx.stroke();
+    // vertical corner light strips for that cyberpunk edge glow
+    ctx.globalAlpha = 0.3; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(bx + 2, fTop); ctx.lineTo(bx + 2, by + bh); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx + bw - 2, fTop); ctx.lineTo(bx + bw - 2, by + bh); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // rooftop details: a service block + an antenna with a beacon light
+    const ux = bw * 0.16, uy = bh * 0.22;
+    const rcx = bx + bw * (0.3 + rng() * 0.4), rcy = topY + bh * (0.4 + rng() * 0.3);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = mixHexA(pal.bg, '#000000', 0.32);
+    roundRect(ctx, rcx - ux / 2, rcy - uy / 2, ux, uy, 3); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.7; ctx.strokeStyle = accent; ctx.lineWidth = 1.6;
+    const antX = bx + bw * 0.5;
+    ctx.beginPath(); ctx.moveTo(antX, topY + bh * 0.5); ctx.lineTo(antX, topY - bh * 0.3); ctx.stroke();
+    ctx.globalAlpha = 0.95; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(antX, topY - bh * 0.3, 3, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+
   // Baked road shadows under the live flow lanes (drawn animated in draw.js).
   ctx.globalCompositeOperation = 'lighter';
   for (const l of room.flowLanes || []) {

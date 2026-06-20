@@ -750,6 +750,9 @@ function drawFlowLanes(room, pal, player) {
   const lanes = room.flowLanes || [];
   if (!lanes.length || reduced()) return;
   const t = room.time || performance.now() / 1000;
+  // Every road leads somewhere worth going: flow + arrows point toward the EXIT (the live
+  // portal once the room's clear, else where it will open). No more rivers to nowhere.
+  const exit = room.portal ? { x: room.portal.x, y: room.portal.y } : { x: room.w / 2, y: room.h * 0.20 };
   // Null Archon signature: the boss can weaponize the lanes — armed (warning flash)
   // then lethal (burns you). Light them up red so the danger is unmissable.
   const archon = room.enemies.find(en => en.bossId === 'archon');
@@ -766,6 +769,10 @@ function drawFlowLanes(room, pal, player) {
     const active = player && flowDist(player.x, player.y, l.x1, l.y1, l.x2, l.y2) < (l.width || 78) + player.r + 12;
     const color = (arming || lethal) ? '#ff4d4d' : (l.color || pal.accent3);
     const width = l.width || 78;
+    // orient flow toward whichever end is nearer the exit
+    const aD = (l.x1 - exit.x) ** 2 + (l.y1 - exit.y) ** 2;
+    const bD = (l.x2 - exit.x) ** 2 + (l.y2 - exit.y) ** 2;
+    const fwd = bD <= aD ? 1 : -1;
     // NOTE: no ctx.shadowBlur here — at city scale (long strokes × ~14 lanes × 3
     // passes/frame) it tanks the frame rate. The 'lighter' blend + the bloom pass
     // give the neon glow for free.
@@ -775,20 +782,49 @@ function drawFlowLanes(room, pal, player) {
     ctx.globalAlpha = active ? 0.72 : 0.34;
     ctx.lineWidth = active ? 5.8 : 3.4;
     ctx.setLineDash([30, 22]);
-    ctx.lineDashOffset = -(t * (active ? 250 : 130) + (l.phase || 0) * 30);
+    ctx.lineDashOffset = -fwd * (t * (active ? 250 : 130) + (l.phase || 0) * 30);
     ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
     if (active) { // bright white speed-line only on the lane you're riding (perf)
       ctx.globalAlpha = 0.85;
       ctx.lineWidth = 1.6;
       ctx.setLineDash([8, 34]);
-      ctx.lineDashOffset = -(t * 360 + (l.phase || 0) * 40);
+      ctx.lineDashOffset = -fwd * (t * 360 + (l.phase || 0) * 40);
       ctx.strokeStyle = '#ffffff';
       ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke();
     }
     ctx.setLineDash([]);
+    // explicit direction arrows on the main routes (arteries + the express loop):
+    // chevrons marching toward the exit so the path to the goal always reads.
+    if (l.kind === 'artery' || l.kind === 'express') {
+      drawLaneChevrons(l, fwd, color, t, active);
+    }
   }
   ctx.shadowBlur = 0;
   ctx.restore();
+}
+
+// Marching ">" chevrons along a lane, pointing toward its exit-ward end.
+function drawLaneChevrons(l, fwd, color, t, active) {
+  const x1 = fwd > 0 ? l.x1 : l.x2, y1 = fwd > 0 ? l.y1 : l.y2;
+  const ex = fwd > 0 ? l.x2 : l.x1, ey = fwd > 0 ? l.y2 : l.y1;
+  const dx = ex - x1, dy = ey - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;       // unit toward exit
+  const nx = -uy, ny = ux;                   // perpendicular
+  const size = Math.min(26, (l.width || 78) * 0.34);
+  const spacing = 230;
+  const scroll = ((t * (active ? 150 : 80)) % spacing);
+  ctx.globalAlpha = active ? 0.85 : 0.5;
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = active ? 3.4 : 2.4;
+  for (let s = scroll + 40; s < len - 40; s += spacing) {
+    const cx = x1 + ux * s, cy = y1 + uy * s;
+    const tipX = cx + ux * size, tipY = cy + uy * size;
+    ctx.beginPath();
+    ctx.moveTo(cx + nx * size, cy + ny * size);
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(cx - nx * size, cy - ny * size);
+    ctx.stroke();
+  }
 }
 function flowDist(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
